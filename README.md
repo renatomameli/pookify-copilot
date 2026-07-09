@@ -41,13 +41,7 @@ Right-click the island to switch between **Clawd** (the crab, default) and the *
 
 ## Multiple sessions
 
-Run as many Claude Code sessions as you like — the closed island always reflects what most
-deserves your attention: a quiet count badge while several sessions work, the amber dot the moment
-any of them awaits permission (a blocked session always wins; ties go to the newest turn). Hover or click to expand: with two or more sessions the drop-down becomes the
-**session stack** — one row per session with its project, current activity, and live timer, most
-urgent first. Click a row to pin that session to the island; click it again to follow urgency again.
-Up to three rows show at once — beyond that the stack scrolls, the next row fading into the black as
-the hint. With a single session, nothing changes at all.
+Run as many Claude Code sessions as you want. The closed island always shows what needs your attention most. If multiple sessions are running, you'll see a small count badge. If any session is waiting for your permission, the island shows an amber dot instead, with blocked sessions always taking priority.
 
 ## Where it works
 
