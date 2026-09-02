@@ -26,8 +26,8 @@ public enum AgentState: String, Codable, Sendable {
         switch self {
         case .permission:        return 3
         case .tool, .thinking:   return 2
-        case .error, .done:      return 1
-        case .completed, .idle:  return 0
+        case .error, .done, .completed: return 1
+        case .idle:              return 0
         }
     }
 

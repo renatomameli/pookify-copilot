@@ -13,6 +13,7 @@
 #
 # Activities:
 #   thinking reading searching running editing writing websearch webfetch
+#   idle thinking reading searching running editing writing websearch webfetch
 #   planning delegating mcp asking compacting working permission input done error
 #
 # Options:
@@ -98,6 +99,7 @@ resolve() {
   local activity="$1"
   STATE=tool LABEL="" TOOL="" AGO=12 DETAIL=""
   case "$activity" in
+    idle)       STATE=idle; LABEL="Idle"; TOOL=""; AGO=0 ;;
     thinking)   STATE=thinking; LABEL="Thinking..."; TOOL=""; AGO=8 ;;
     reading)    LABEL="Reading"; TOOL=view; DETAIL="sidebar.tsx" ;;
     searching)  LABEL="Searching"; TOOL=rg ;;
@@ -178,7 +180,7 @@ show_multi() {
       1) project="dashboard"; state=permission; label="Awaiting permission"; tool=bash; ago=130; detail="" ;;
       2) project="docs-site"; state=tool; label=Reading; tool=view; ago=18; detail="README.md" ;;
       3) project="release"; state=tool; label="Running command"; tool=bash; ago=320; detail="" ;;
-      4) project="mobile-app"; state=thinking; label="Thinking..."; tool=""; ago=8; detail="" ;;
+      4) project="mobile-app"; state=idle; label=""; tool=""; ago=0; detail="" ;;
     esac
     printf '{"schema":2,"provider":"copilot","sessionId":"multi%s","state":"%s","label":"%s","tool":"%s","project":"%s","cwd":"%s","pid":%s,"startedAt":%s,"ts":%s,"toolEndsAt":0,"detail":"%s"}\n' \
       "$i" "$state" "$label" "$tool" "$project-$i" "$(json_escape "$REPO")" \
@@ -209,7 +211,7 @@ stop_demo() {
 }
 
 ACTIVITIES=(
-  thinking reading searching running editing writing websearch webfetch planning
+  idle thinking reading searching running editing writing websearch webfetch planning
   delegating mcp asking compacting working permission input "done" error
 )
 

@@ -24,7 +24,7 @@ final class IslandModel: ObservableObject {
 
     /// The expanded drop-down is the session stack rather than the single-session layout.
     var isMulti: Bool { sessions.count >= 2 }
-    /// Finished sessions that are ready for the user while another session is still active.
+    /// Finished sessions that are ready for the user.
     var readyCount: Int {
         sessions.filter { $0.state == .done || $0.state == .completed }.count
     }

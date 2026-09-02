@@ -8,7 +8,7 @@ struct SessionInfo: Identifiable, Equatable {
     let id: String
     var pid: Int32            // Copilot CLI process; its ancestry identifies the terminal app
     var provider: Provider
-    var state: AgentState   // effective state (caps/lingers applied), never .idle here
+    var state: AgentState   // effective state (caps/lingers applied)
     var label: String       // "Editing", "Thinking…", "Awaiting permission", …
     var detail: String      // file basename while in a tool, else empty
     var project: String     // basename of the session's cwd
@@ -19,8 +19,8 @@ struct SessionInfo: Identifiable, Equatable {
 /// show. Stateless: it reaps dead sessions, recovers frozen ones, and surfaces every live
 /// session, ordered by urgency (a permission request always beats one merely working).
 struct IslandDecision {
-    /// Non-idle sessions, most deserving of attention first: highest priority, then the newest
-    /// turn. `startedAt` (not `ts`) breaks ties so rows don't shuffle mid-turn as heartbeats land.
+    /// Open sessions, most deserving of attention first: highest priority, then the newest turn.
+    /// `startedAt` (not `ts`) breaks ties so rows don't shuffle mid-turn as heartbeats land.
     var sessions: [SessionInfo]
     var visible: Bool
     var liveCount: Int
@@ -45,8 +45,6 @@ enum SessionAggregator {
     // Generous backstop for a turn that ends without an agentStop or sessionEnd hook. A later hook
     // immediately revives the session, so a long-running tool can still report completion.
     static let workBackstopCap: TimeInterval = 900
-    // How long past its last update an idle session keeps the app alive.
-    static let appHold: TimeInterval = 300
     // Hard reap: delete a file this old no matter what (protects against pid reuse and junk
     // buildup from sessions that never fire sessionEnd).
     static let reapCap: TimeInterval = 7200
@@ -141,19 +139,16 @@ enum SessionAggregator {
             effs[i]
         }
 
-        // Sessions that are visibly doing something — or only went quiet moments ago — keep the
-        // app alive. Long-idle files (e.g. closed extension sessions whose host pid persists)
-        // don't, so the app can still quit itself.
-        let liveCount = live.indices.filter {
-            displayState($0) != .idle || now - live[$0].ts <= appHold
-        }.count
+        // Every live local CLI process keeps the app available, including an idle terminal. This
+        // makes all open sessions selectable rather than making an idle one disappear from a
+        // two-session stack.
+        let liveCount = live.count
         guard !live.isEmpty else { return .hidden }
 
-        // Every session with something to say, as the UI will render it. Display-idle sessions
-        // are omitted (they're resting, not gone — their files persist for turn-clock continuity).
-        let sessions: [SessionInfo] = live.indices.compactMap { i -> SessionInfo? in
+        // Every open session gets a row. A stale working state may resolve to idle, but the live
+        // process remains selectable and will update again on its next prompt.
+        let sessions: [SessionInfo] = live.indices.map { i -> SessionInfo in
             let eff = displayState(i)
-            guard eff != .idle else { return nil }
             let s = live[i]
             return SessionInfo(
                 id: s.sessionId,
@@ -177,7 +172,7 @@ enum SessionAggregator {
 
         return IslandDecision(
             sessions: sessions,
-            visible: !sessions.isEmpty,   // hide while everything rests; the app stays alive
+            visible: !sessions.isEmpty,
             liveCount: liveCount,
             forceExpand: sessions.first?.state == .permission
         )

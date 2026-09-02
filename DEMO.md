@@ -19,6 +19,7 @@ demo process and its isolated files.
 
 | Command | Display |
 |---|---|
+| `idle` | Open session between turns |
 | `thinking` | Thinking |
 | `reading` | Reading with a file name |
 | `searching` | Searching source |

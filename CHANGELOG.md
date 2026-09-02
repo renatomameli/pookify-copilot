@@ -17,6 +17,8 @@ All notable changes to Pookify Copilot are documented here. The format follows
 - With one session remaining, clicking anywhere on the island opens its terminal and collapses
   the panel as visual confirmation. Hover stays suppressed until the pointer exits, so this
   feedback remains visible even when the target terminal was already frontmost.
+- Open Copilot sessions now remain in the stack as **Idle** between turns instead of disappearing,
+  so two open terminals always produce two selectable session entries.
 - The expanded session stack now shows ten complete rows before scrolling instead of three.
 
 ## [0.1.0]

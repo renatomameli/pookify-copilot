@@ -191,9 +191,9 @@ struct IslandPill: View {
             .background(Capsule().fill(Theme.green))
             .accessibilityLabel("\(model.readyCount) sessions ready")
             .help("\(model.readyCount) \(model.readyCount == 1 ? "session" : "sessions") ready")
-        } else if model.isMulti && model.state.isWorking {
+        } else if model.isMulti && model.state != .permission && model.state != .error {
             // Several sessions, several clocks — one timer would just be whichever session
-            // happens to lead, which reads as wrong. With none ready, show how many are live;
+            // happens to lead, which reads as wrong. With none ready, show how many are open;
             // once a session finishes, this becomes the green ready-count badge above.
             Text("\(model.sessions.count)")
                 .font(.system(size: 10.5, weight: .semibold).monospacedDigit())
@@ -483,6 +483,7 @@ private struct SessionRow: View {
         switch session.state {
         case .permission, .error: return Theme.amber
         case .completed:          return Theme.green
+        case .idle:               return .white.opacity(0.28)
         default:                  return Theme.accent(session.provider)
         }
     }
@@ -516,6 +517,7 @@ private struct SessionRow: View {
         case .done:       return "Done"
         case .completed:  return "Done"
         case .error:      return "Error"
+        case .idle:       return "Idle"
         default:          return session.label.isEmpty ? "Working…" : session.label
         }
     }

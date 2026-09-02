@@ -24,7 +24,20 @@ assert_equal() {
 
 tmp_base="${TMPDIR:-/tmp}"
 root="$(mktemp -d "$tmp_base/pookify-copilot.XXXXXX")"
-trap 'rm -rf "${root:?}"' EXIT
+idle_pid=""
+done_pid=""
+cleanup() {
+  if [[ "$idle_pid" =~ ^[0-9]+$ ]]; then
+    kill "$idle_pid" 2>/dev/null || true
+    wait "$idle_pid" 2>/dev/null || true
+  fi
+  if [[ "$done_pid" =~ ^[0-9]+$ ]]; then
+    kill "$done_pid" 2>/dev/null || true
+    wait "$done_pid" 2>/dev/null || true
+  fi
+  rm -rf "${root:?}"
+}
+trap cleanup EXIT
 mkdir -p "$root/copilot"
 
 COPILOT_HOME="$root/copilot" ISLAND_SUPPORT_DIR="$root/support" "$APP" --install >/dev/null
@@ -110,6 +123,30 @@ assert_equal "$(jq -r .state "$state")" "done" "agentStop state"
 
 send session-end "{\"sessionId\":\"integration\",\"cwd\":\"/tmp/project\",\"timestamp\":$((event_ms + 2000))}"
 [[ ! -e "$state" ]] || fail "sessionEnd did not remove state"
+
+aggregate_support="$root/aggregate-support"
+sleep 30 &
+idle_pid=$!
+sleep 30 &
+done_pid=$!
+printf '%s' '{"sessionId":"idle-live","cwd":"/tmp/idle"}' \
+  | COPILOT_SESSION_PID="$idle_pid" ISLAND_SUPPORT_DIR="$aggregate_support" \
+    "$helper" copilot session-start
+printf '%s' '{"sessionId":"done-live","cwd":"/tmp/done"}' \
+  | COPILOT_SESSION_PID="$done_pid" ISLAND_SUPPORT_DIR="$aggregate_support" \
+    "$helper" copilot session-start
+printf '%s' '{"sessionId":"done-live","cwd":"/tmp/done"}' \
+  | COPILOT_SESSION_PID="$done_pid" ISLAND_SUPPORT_DIR="$aggregate_support" \
+    "$helper" copilot prompt
+printf '%s' '{"sessionId":"done-live","cwd":"/tmp/done"}' \
+  | COPILOT_SESSION_PID="$done_pid" ISLAND_SUPPORT_DIR="$aggregate_support" \
+    "$helper" copilot stop
+sessions="$(ISLAND_SUPPORT_DIR="$aggregate_support" "$APP" --dump-sessions)"
+jq -e '
+  length == 2
+  and any(.[]; .id == "idle-live" and .state == "idle")
+  and any(.[]; .id == "done-live" and .state == "done")
+' <<< "$sessions" >/dev/null || fail "open idle session was omitted from aggregation"
 
 COPILOT_HOME="$root/copilot" ISLAND_SUPPORT_DIR="$root/support" "$APP" --uninstall >/dev/null
 [[ ! -e "$config" ]] || fail "uninstall did not remove hook file"
