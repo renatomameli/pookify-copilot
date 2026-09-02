@@ -27,7 +27,7 @@ enum Theme {
     }()
 
     static let amber = Color(.sRGB, red: 0.96, green: 0.74, blue: 0.18, opacity: 1)
-    // A calm green for finished ("completed") sessions — distinct from the working accent (orange)
+    // A calm green for finished ("completed") sessions — distinct from the working accent (blue)
     // and the attention amber, so a resting done session reads as done at a glance.
     static let green = Color(.sRGB, red: 0.36, green: 0.80, blue: 0.50, opacity: 1)
 
@@ -40,7 +40,7 @@ enum Theme {
     // single-session layout. These knobs size it; with one session nothing here applies.
     static let sessionRowHeight: CGFloat = 28   // one session row in the expanded stack
     static let sessionRowSpacing: CGFloat = 2
-    static let sessionRowsVisible = 3           // full rows shown at most; more sessions scroll
+    static let sessionRowsVisible = 10          // full rows shown at most; more sessions scroll
     /// Expanded drop-down height for `count` sessions (single session uses `dropHeight`).
     /// Past `sessionRowsVisible` the list scrolls: two thirds of the next row peek out and
     /// dissolve into a deep fog at the bottom edge — that fade is the whole scroll hint.

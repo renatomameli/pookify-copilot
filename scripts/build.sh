@@ -1,12 +1,12 @@
 #!/bin/bash
-# Builds "Pookify.app" from the SwiftPM executables (no Xcode required) and
+# Builds "Pookify Copilot.app" from the SwiftPM executables (no Xcode required) and
 # ad-hoc signs it. Optionally packages a distributable zip with: ./scripts/build.sh --zip
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-NAME="Pookify"                       # internal binary/target name (the process name)
-APP_NAME="Pookify"     # user-facing app name (bundle + Finder)
-BUNDLE_ID="com.pookify.app"
+NAME="PookifyCopilot"                # internal binary/target name (the process name)
+APP_NAME="Pookify Copilot"           # user-facing app name (bundle + Finder)
+BUNDLE_ID="com.pookify.copilot"
 VERSION="0.1.0"
 APP="build/$APP_NAME.app"
 
@@ -91,7 +91,7 @@ echo "Built $APP"
 
 if [[ "${1:-}" == "--zip" ]]; then
   mkdir -p build
-  ZIP="build/$APP_NAME.zip"
+  ZIP="build/Pookify-Copilot.zip"
   rm -f "$ZIP"
   # ditto preserves the bundle layout and resource forks correctly (zip -r does not).
   ditto -c -k --keepParent "$APP" "$ZIP"

@@ -6,7 +6,7 @@ labels: enhancement
 ---
 
 **The problem / motivation**
-What are you trying to do that Pookify doesn't support today?
+What are you trying to do that Pookify Copilot doesn't support today?
 
 **Proposed solution**
 What you'd like to see.

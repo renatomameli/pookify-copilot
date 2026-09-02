@@ -18,7 +18,7 @@ final class AppController: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         Island.ensureDirs()
 
-        // Single instance: if another live Pookify already owns the notch (e.g. the demo harness
+        // Single instance: if another live app already owns the notch (for example the demo
         // binary alongside the installed app), bow out instead of drawing a second island.
         if let s = try? String(contentsOf: Island.appPidFile, encoding: .utf8),
            let pid = Int32(s.trimmingCharacters(in: .whitespacesAndNewlines)), pid > 0,
@@ -33,24 +33,16 @@ final class AppController: NSObject, NSApplicationDelegate {
             .write(to: Island.appPidFile, atomically: true, encoding: .utf8)
 
         // Wire up hooks on first launch / version change, off the main thread.
-        // ISLAND_NO_INSTALL=1 skips this (used for development / screenshots so we never touch
-        // the user's real ~/.claude config unexpectedly).
+        // ISLAND_NO_INSTALL=1 skips this for development and screenshots.
         if ProcessInfo.processInfo.environment["ISLAND_NO_INSTALL"] != "1" {
             DispatchQueue.global(qos: .utility).async {
                 _ = HookInstaller.ensureInstalledIfNeeded()
             }
         }
 
-        // Restore the saved Claude icon style (env override for dev/screenshots).
-        if let raw = ProcessInfo.processInfo.environment["ISLAND_CLAUDE_STYLE"] ?? UserDefaults.standard.string(forKey: "claudeStyle"),
-           let style = ClaudeStyle(rawValue: raw) {
-            model.claudeStyle = style
-        }
-
         model.onActivate = { [weak self] in self?.toggleExpanded() }
         model.onSelectSession = { [weak self] id in self?.selectSession(id) }
         model.onQuit = { [weak self] in self?.quit() }
-        model.onChooseClaudeStyle = { [weak self] style in self?.chooseClaudeStyle(style) }
         model.onChooseDisplay = { [weak self] id in self?.chooseDisplay(id) }
         windowController.install()
 
@@ -107,11 +99,19 @@ final class AppController: NSObject, NSApplicationDelegate {
         return top
     }
 
-    /// A click on a session row: pin it to the island (clicking the pinned row unpins → auto).
-    /// Applies immediately so the highlight and closed bar respond to the click, not the next poll.
+    /// A row click focuses the terminal that owns the session and pins the row to the island
+    /// (clicking it again unpins -> auto). The highlight updates immediately while process
+    /// resolution runs off the main thread.
     private func selectSession(_ id: String) {
+        guard let session = lastDecision?.sessions.first(where: { $0.id == id }) else {
+            NSLog("Pookify Copilot: selected session \(id) is no longer available.")
+            NSSound.beep()
+            return
+        }
+        NSLog("Pookify Copilot: opening terminal for session \(id), PID \(session.pid).")
         model.pinnedId = (model.pinnedId == id) ? nil : id
         if let d = lastDecision { apply(d) }
+        TerminalActivator.activate(sessionPID: session.pid)
     }
 
     private func apply(_ d: IslandDecision) {
@@ -227,11 +227,6 @@ final class AppController: NSObject, NSApplicationDelegate {
         } else {
             notNeededSince = now
         }
-    }
-
-    private func chooseClaudeStyle(_ style: ClaudeStyle) {
-        model.claudeStyle = style
-        UserDefaults.standard.set(style.rawValue, forKey: "claudeStyle")
     }
 
     /// Move the island to a chosen display (nil = automatic). The setter persists the choice;

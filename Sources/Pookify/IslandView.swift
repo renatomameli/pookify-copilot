@@ -150,10 +150,8 @@ struct IslandPill: View {
     private var notchRow: some View {
         HStack(spacing: 0) {
             // Left wing — the agent's mark, ALWAYS here, centered (never moves between states).
-            // Animates while working; when the turn is done it rests on its fullest frame (a
-            // complete spark next to the checkmark), never frozen mid-morph.
-            AgentGlyph(provider: model.provider, claudeStyle: model.claudeStyle,
-                       working: model.state.isWorking, size: iconSize)
+            // Animates while working and rests next to the status when attention is needed.
+            AgentGlyph(provider: model.provider, working: model.state.isWorking, size: iconSize)
                 .frame(width: iconSize, height: iconSize)
                 .frame(width: wing, height: closedH)
                 .offset(x: wingInset)                  // nudge toward the notch to optically center
@@ -169,11 +167,24 @@ struct IslandPill: View {
     }
 
     @ViewBuilder private var rightStatus: some View {
-        if model.isMulti && model.state.isWorking {
+        if model.isMulti && model.state.isWorking && model.readyCount > 0 {
+            HStack(spacing: 3) {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 8, weight: .bold))
+                Text("\(model.readyCount)")
+                    .font(.system(size: 10.5, weight: .bold).monospacedDigit())
+            }
+            .foregroundStyle(Theme.green)
+            .lineLimit(1)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2.5)
+            .background(Capsule().fill(Theme.green.opacity(0.16)))
+            .accessibilityLabel("\(model.readyCount) sessions ready")
+            .help("\(model.readyCount) \(model.readyCount == 1 ? "session" : "sessions") ready")
+        } else if model.isMulti && model.state.isWorking {
             // Several sessions, several clocks — one timer would just be whichever session
-            // happens to lead, which reads as wrong. Show how many are live instead; the
-            // per-session timers live in the stack. (Permission/done/error still take over
-            // below, exactly as with one session.)
+            // happens to lead, which reads as wrong. With none ready, show how many are live;
+            // once a session finishes, this becomes the green ready-count badge above.
             Text("\(model.sessions.count)")
                 .font(.system(size: 10.5, weight: .semibold).monospacedDigit())
                 .foregroundStyle(.white.opacity(0.95))
@@ -251,8 +262,8 @@ struct IslandPill: View {
 
     // MARK: session stack (2+ sessions — every session as a row, most urgent first)
 
-    /// Three rows tall; with more sessions the list scrolls (trackpad/wheel) and half of the
-    /// fourth row peeks out, fogged into the black — the scroll affordance. The fog lifts once
+    /// Ten rows tall; with more sessions the list scrolls (trackpad/wheel) and part of the
+    /// eleventh row peeks out, fogged into the black — the scroll affordance. The fog lifts once
     /// you reach the bottom, and a matching fade appears at the top when rows sit above.
     ///
     /// At-edge detection reads the content's REAL frame in the scroll viewport (not computed
@@ -329,10 +340,6 @@ struct IslandPill: View {
             Button("Unpin — follow the busiest session") { model.onSelectSession(pin) }
             Divider()
         }
-        Menu("Claude icon") {
-            Button((model.claudeStyle == .spark ? "✓ " : "") + "Spark") { chooseStyle(.spark) }
-            Button((model.claudeStyle == .crab ? "✓ " : "") + "Clawd (crab)") { chooseStyle(.crab) }
-        }
         if NSScreen.screens.count > 1 {
             Menu("Display") {
                 // Automatic owns the check whenever the preference isn't in effect — including a
@@ -369,15 +376,6 @@ struct IslandPill: View {
         model.onChooseDisplay(id)
     }
 
-    /// Apply a Claude icon choice and drop the hover state. Opening the context menu can swallow the
-    /// pointer-exit event, leaving `hovering` stuck true (the pill stays expanded after the menu
-    /// closes); clearing it here collapses the pill cleanly once you move away.
-    private func chooseStyle(_ style: ClaudeStyle) {
-        hoverWork?.cancel()
-        model.hovering = false
-        model.onChooseClaudeStyle(style)
-    }
-
     private var accentColor: Color {
         switch model.state {
         case .permission, .error: return Theme.amber
@@ -387,7 +385,7 @@ struct IslandPill: View {
 
     private var statusTitle: String {
         switch model.state {
-        case .permission: return "Awaiting permission"
+        case .permission: return model.label.isEmpty ? "Awaiting input" : model.label
         case .done:       return "Done"
         case .completed:  return "Done"
         case .error:      return "Error"
@@ -411,8 +409,8 @@ private struct StackEdges: Equatable {
 }
 
 /// One session in the expanded stack: state dot · project · activity (+ file) · live timer.
-/// Clicking a row pins that session to the island (clicking the pinned one unpins). The row's
-/// own tap gesture wins over the pill's expand/collapse toggle, so selecting never collapses.
+/// Clicking a row focuses its terminal and pins the session to the island (clicking the pinned
+/// one unpins). The row's tap gesture wins over the pill's expand/collapse toggle.
 private struct SessionRow: View {
     let session: SessionInfo
     let isDisplayed: Bool
@@ -420,47 +418,49 @@ private struct SessionRow: View {
     @State private var hovering = false
 
     var body: some View {
-        HStack(spacing: 7) {
-            Circle()
-                .fill(dotColor)
-                .frame(width: 6, height: 6)
-            Text(projectDisplay)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.white)
-                .lineLimit(1)
-                .layoutPriority(1)
-            // Activity + file name: the file name is the informative part and must stay whole.
-            // When both can't fit, the generic label ("Reading", "Editing") drops out entirely —
-            // ViewThatFits, so it never leaves a truncated sliver behind. Only a truly long
-            // file name ever truncates, and then in its middle so the extension survives.
-            Group {
-                if session.detail.isEmpty {
-                    activityText
-                } else {
-                    ViewThatFits(in: .horizontal) {
-                        HStack(spacing: 4) {
-                            activityText
+        Button(action: select) {
+            HStack(spacing: 7) {
+                Circle()
+                    .fill(dotColor)
+                    .frame(width: 6, height: 6)
+                Text(projectDisplay)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .layoutPriority(1)
+                // Activity + file name: the file name is the informative part and must stay whole.
+                // When both can't fit, the generic label drops out entirely so only useful context
+                // remains. A truly long file name truncates in the middle to preserve its extension.
+                Group {
+                    if session.detail.isEmpty {
+                        activityText
+                    } else {
+                        ViewThatFits(in: .horizontal) {
+                            HStack(spacing: 4) {
+                                activityText
+                                detailText
+                            }
                             detailText
                         }
-                        detailText
                     }
                 }
+                .layoutPriority(0.9)
+                Spacer(minLength: 4)
+                trailing
+                    .layoutPriority(1)
             }
-            // Must outrank the Spacer: at equal priority the spacer splits the free width with
-            // the text group and the label truncates even when the row has room to spare.
-            .layoutPriority(0.9)
-            Spacer(minLength: 4)
-            trailing
-                .layoutPriority(1)
+            .padding(.horizontal, 8)
+            .frame(maxWidth: .infinity)
+            .frame(height: Theme.sessionRowHeight)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(.white.opacity(isDisplayed ? 0.09 : hovering ? 0.05 : 0))
+            )
+            .contentShape(Rectangle())
         }
-        .padding(.horizontal, 8)
-        .frame(height: Theme.sessionRowHeight)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(.white.opacity(isDisplayed ? 0.09 : hovering ? 0.05 : 0))
-        )
-        .contentShape(Rectangle())
-        .onTapGesture(perform: select)
+        .buttonStyle(.plain)
+        .help("Open \(projectDisplay) terminal")
+        .accessibilityLabel("Open \(projectDisplay) terminal, \(activityWord)")
         .onHover { hovering = $0 }
         .animation(.easeOut(duration: 0.15), value: hovering)
         .animation(.easeOut(duration: 0.15), value: isDisplayed)
@@ -499,7 +499,7 @@ private struct SessionRow: View {
 
     private var activityWord: String {
         switch session.state {
-        case .permission: return "Awaiting permission"
+        case .permission: return session.label.isEmpty ? "Awaiting input" : session.label
         case .done:       return "Done"
         case .completed:  return "Done"
         case .error:      return "Error"

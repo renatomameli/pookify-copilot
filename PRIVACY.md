@@ -1,11 +1,15 @@
 # Privacy
 
-Pookify is fully local and makes **no network calls**.
+Pookify Copilot is fully local and makes **no network calls**.
 
-- No telemetry, no analytics, no accounts. Nothing is ever sent anywhere.
-- It reads and writes only on your Mac:
-  - Per-session status files under `~/Library/Application Support/Pookify/state.d/` (state, a short tool label, the project folder name, and the agent's process id, used to tell when a session ends). These are deleted as sessions end.
-  - Hook entries it adds to `~/.claude/settings.json`, backed up to `settings.json.bak-pookify` before the first edit. `./scripts/uninstall.sh` removes them.
-- It does not read your prompts, code, or conversation transcripts.
+- No telemetry, analytics, accounts, or remote services.
+- Per-session status is stored under
+  `~/Library/Application Support/Pookify Copilot/state.d/` with owner-only permissions.
+- Status files contain the Copilot session ID, lifecycle state, tool name, project/working
+  directory, optional file basename, timestamps, and the local Copilot process ID.
+- Copilot hook payloads are handled in memory. Prompt text, code, tool arguments other than a file
+  path, tool results, error details, and transcripts are not persisted.
+- The installer owns only `~/.copilot/hooks/pookify-copilot.json` (or the equivalent path under
+  `COPILOT_HOME`). It does not edit Copilot's settings or other hook files.
 
-That's it.
+The uninstall script removes the owned hook file, helper, state, and app.

@@ -1,26 +1,30 @@
 import AppKit
 import IslandCore
 
-// Headless management commands, so the install/uninstall scripts can wire hooks without opening
-// the UI:  Pookify --install  /  --uninstall
+// Headless management commands let scripts wire hooks without opening the UI.
 let argv = CommandLine.arguments
 if argv.contains("--uninstall") {
-    HookInstaller.uninstall()
-    print("Removed Pookify hooks from Claude Code.")
-    exit(0)
+    do {
+        try HookInstaller.uninstall()
+        print("Removed Pookify Copilot hooks.")
+        exit(0)
+    } catch {
+        fputs("Pookify Copilot: \(error.localizedDescription)\n", stderr)
+        exit(1)
+    }
 }
 if argv.contains("--install") {
-    let wired = HookInstaller.installAll()
-    if wired.isEmpty {
-        print("No Claude Code config found to wire up (is Claude Code installed?).")
-        print("Run `claude` once, then re-run ./scripts/install.sh — or just launch Pookify again.")
-    } else {
-        print("Wired Pookify into:\n" + wired.map { "  • \($0)" }.joined(separator: "\n"))
+    do {
+        let wired = try HookInstaller.installAll()
+        print("Wired Pookify Copilot into:\n" + wired.map { "  - \($0)" }.joined(separator: "\n"))
+        exit(0)
+    } catch {
+        fputs("Pookify Copilot: \(error.localizedDescription)\n", stderr)
+        exit(1)
     }
-    exit(0)
 }
 
-// Pookify — background agent (no Dock icon, no menu bar item). UI lives entirely
+// Pookify Copilot is a background agent (no Dock icon or menu bar item). UI lives entirely
 // on the notch. We drive the app from an AppDelegate rather than the SwiftUI App lifecycle so it
 // behaves correctly when built as a bare SwiftPM executable wrapped in a hand-assembled bundle.
 //

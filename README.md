@@ -1,63 +1,67 @@
 <div align="center">
 
-<img src="docs/demo.gif" alt="Pookify — the Claude Code dynamic island, live on the MacBook notch" width="760">
+# Pookify Copilot
 
-<img src="docs/multi-sessions.gif" alt="Multiple Claude Code sessions — the closed bar shows a session count, and hovering opens the session stack" width="760">
-
-# Pookify 🐼
-
-The Claude Code dynamic Island for your MacBook.
+The GitHub Copilot CLI dynamic island for your MacBook.
 
 </div>
 
+Pookify Copilot is an unofficial macOS notch app that shows what local Copilot CLI sessions
+are doing: thinking, reading, editing, running commands, delegating, waiting for permission,
+requesting input, finishing, or failing. Multiple sessions are sorted by urgency in an expandable
+stack.
+
+## Requirements
+
+- macOS 14 or later
+- Apple Silicon by default (`UNIVERSAL=1` also builds for Intel)
+- Swift 6 / Xcode Command Line Tools
+- GitHub Copilot CLI with hooks support (1.0.82 or newer)
+
+Install the command-line tools first if needed:
+
+```bash
+xcode-select --install
+```
 
 ## Install
 
-**1. Clone the repo**
+Clone, build, and install:
 
 ```bash
-git clone https://github.com/eyadhammouda/pookify
-cd pookify
-```
-
-**2. Build and install**
-
-```bash
+git clone https://github.com/renatomameli/pookify-copilot.git
+cd pookify-copilot
 ./scripts/install.sh
 ```
 
-This adds Pookify to your Applications and sets up Claude Code. Start a session and the island shows up on your notch.
+The installer builds `/Applications/Pookify Copilot.app`, installs its helper under
+`~/Library/Application Support/Pookify Copilot/bin/`, and creates the owned user hook file
+`~/.copilot/hooks/pookify-copilot.json`.
 
-> On MacBooks without a notch, Pookify draws its own. The island looks and works the same.
+Restart Copilot CLI after installation because hook configurations are loaded when the CLI
+starts. The island appears when Copilot begins a turn and the app quits itself after all sessions
+become idle.
 
-> **Build trouble?** Make sure Xcode's Command Line Tools are installed first: `xcode-select --install`
-
-## Claude icons
-
-Right-click the island to switch between **Clawd** (the crab, default) and the **Spark**.
-
-<a href="docs/change-icon.gif"><img src="docs/change-icon-poster.png" alt="Switching the Claude icon from the island's right-click menu — click to play" width="640"></a>
-
+> If `COPILOT_HOME` is set, the installer writes the hook below `$COPILOT_HOME/hooks/`.
 
 ## Multiple sessions
 
-Run as many Claude Code sessions as you want. The closed island always shows what needs your attention most. If multiple sessions are running, you'll see a small count badge. If any session is waiting for your permission, the island shows an amber dot instead, with blocked sessions always taking priority.
-
-## Where it works
-
-- ✅ Claude Code in the terminal
-- ✅ Claude Code in the VS Code extension
-- ✅ Several sessions at once, across both
+Run as many local Copilot CLI sessions as you want. The closed island shows the session needing
+the most attention. Permission and input requests take priority and auto-expand once. Hover or
+click the island to open the full session stack. Clicking a row brings that session's existing
+terminal or IDE to the foreground and pins the row; click it again to resume automatic ordering.
+When one or more sessions finish while others are active, the closed island shows a green check
+and the number of sessions ready for review. Up to ten sessions are shown at once before the
+stack starts scrolling.
 
 ## Update
 
+Pull the latest source and run the installer again:
+
 ```bash
-cd pookify
 git pull
 ./scripts/install.sh
 ```
-
-Same command as installing — it rebuilds, replaces the app, and refreshes the hooks. If the island is on screen at that moment, right-click it → Quit once; the new version takes over from the next session.
 
 ## Uninstall
 
@@ -65,37 +69,51 @@ Same command as installing — it rebuilds, replaces the app, and refreshes the 
 ./scripts/uninstall.sh
 ```
 
-Removes the app and its hooks. Your config backup (`settings.json.bak-pookify`) stays in place.
+This removes only Pookify Copilot's owned hook file, local state/helper files, and application.
+Other Copilot settings and hooks are untouched.
 
 ## How it works
 
-Claude Code runs a hook each time something happens (a tool starts, a tool finishes, a turn ends, a prompt needs approval). A small compiled helper, `island-hook`, writes that session's status to a JSON file under `~/Library/Application Support/Pookify/state.d/` — one file per session. The app checks that folder a few times a second, sorts the live sessions by urgency, and draws the notch: the most urgent session on the closed bar, all of them in the expanded stack.
+Copilot CLI invokes `island-hook` for lifecycle events such as `userPromptSubmitted`,
+`preToolUse`, `postToolUse`, `agentStop`, and `sessionEnd`. The helper normalizes those events
+into one small JSON file per session under:
 
-The installer adds its hooks to `~/.claude/settings.json`, backs the file up first, and leaves your other hooks and settings alone.
+```text
+~/Library/Application Support/Pookify Copilot/state.d/
+```
 
-To preview every state without running an agent, see [DEMO.md](DEMO.md).
+The app polls that directory, ranks live sessions, and renders the highest-priority state on the
+closed bar. The `notification` hook is restricted to `permission_prompt` and
+`elicitation_dialog`; `permissionRequest` is deliberately not used because it fires before every
+permission evaluation, including requests that never block the user.
 
+`preToolUse` command hooks normally fail closed in Copilot CLI. The generated command explicitly
+ends with `|| true`, ensuring a missing or broken status helper can never deny a tool.
 
-## Limitations
+To preview every state without installing hooks, see [DEMO.md](DEMO.md).
 
-- On a notched Mac (14-inch or 16-inch MacBook Pro, or a notched MacBook Air) the island fuses with the hardware notch. On Macs without one, Pookify draws a notch of the same proportions at the top of the screen, so the experience is the same.
-- With more than one display connected, Pookify shows on the notched screen (or the main one). To move it elsewhere, right-click the island → **Display** and pick a screen; **Automatic** restores the default. The choice is remembered.
-- Building from source needs Xcode's Command Line Tools (`xcode-select --install`).
+## Scope and limitations
+
+- Supports local GitHub Copilot CLI sessions. It does not install hooks into the VS Code
+  extension or Copilot cloud agent.
+- On a notched Mac, the island fuses with the hardware notch. Other Macs get a synthetic notch.
+- With several displays, right-click the island and use **Display** to move it immediately.
+  **Automatic** returns it to the built-in notched display. The choice is remembered.
+- Terminal focusing follows the Copilot process to its owning macOS application. If several
+  terminal windows share one application process, the application's most recent window is used.
+- A turn that terminates without an `agentStop` or `sessionEnd` event is hidden by a conservative
+  stale-state backstop.
 
 ## Privacy
 
-Pookify runs entirely on your Mac. It makes no network calls and collects no analytics. See [PRIVACY.md](PRIVACY.md).
+Everything runs locally. There are no network calls, accounts, telemetry, or analytics. Prompt
+text, code, tool output, and transcripts are not persisted. See [PRIVACY.md](PRIVACY.md).
 
-## Trademark and affiliation
+## Attribution and trademarks
 
-Pookify is an independent, unofficial, open-source project. It is not affiliated with, endorsed by, or sponsored by Anthropic or Apple.
-
-Product names and logos belong to their owners and are used here only to say what Pookify works with:
-
-- "Claude", "Claude Code", and the Claude spark logo are trademarks of Anthropic, PBC.
-- "Dynamic Island", "MacBook", and "macOS" are trademarks of Apple Inc. Pookify is a notch status display in the style of the Dynamic Island; it is not Apple's product.
-
-The MIT license covers Pookify's source code only and grants no rights to any third-party trademark, logo, or brand. See [TRADEMARKS.md](TRADEMARKS.md). Bundled third-party material (the claude-status-bar artwork under MIT) is credited in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), which also ships inside the app. If you are a rights holder and want a mark removed, open an issue and it will be handled promptly. This is a free, non-commercial project.
+This project is based on [Pookify](https://github.com/eyadhammouda/pookify), used under the MIT
+License. It is an independent project and is not affiliated with or endorsed by GitHub or Apple.
+See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and [TRADEMARKS.md](TRADEMARKS.md).
 
 ## License
 

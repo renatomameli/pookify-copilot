@@ -1,34 +1,31 @@
 # Security policy
 
-Pookify runs entirely on your Mac, makes no network calls, and collects no
-data. Its trust boundary is small, but it does two privileged-feeling things:
+Pookify Copilot runs locally, makes no network calls, and collects no data. Its main trust
+boundaries are:
 
-- It runs a compiled helper (`island-hook`) from Claude Code's hooks.
-- It edits `~/.claude/settings.json` (backing it up to `*.bak-pookify` before
-  the first edit).
+- Copilot CLI runs the compiled `island-hook` helper at lifecycle points.
+- The installer creates `~/.copilot/hooks/pookify-copilot.json`.
+- Session metadata is written below `~/Library/Application Support/Pookify Copilot/`.
+
+The generated `preToolUse` command ends with `|| true`. This is required because Copilot CLI
+treats a failed command hook as a denial; a status-only integration must fail open and never
+control tool execution.
 
 ## Reporting a vulnerability
 
-Please report security issues **privately** — do not open a public issue.
-
-- Preferred: GitHub's private vulnerability reporting
-  (the repository's **Security → Report a vulnerability** tab).
-- You'll get an acknowledgement as soon as possible, and a fix or mitigation
-  will be coordinated before any public disclosure.
-
-When reporting, include the macOS version, the Claude Code version, and the
-steps to reproduce.
+Report security issues privately through GitHub's private vulnerability reporting rather than a
+public issue. Include the macOS version, Copilot CLI version, Pookify Copilot version, and steps to
+reproduce.
 
 ## Scope notes
 
-- State files live under `~/Library/Application Support/Pookify/state.d/` with
-  owner-only permissions (`0700` dir, `0600` files) and contain a session's
-  state, a short tool label, the project folder name, the working directory, the
-  model name, and the agent's process id.
-- The installer refuses to overwrite a config file it can't parse as a JSON
-  object, and only writes config when `~/.claude` already exists.
-- Hook commands are written with the helper path single-quoted for the shell.
+- State directories use mode `0700`; state and hook files use mode `0600`.
+- The helper persists metadata only, never prompt text, code, tool output, error details, or
+  transcripts.
+- The installer refuses to overwrite a pre-existing `pookify-copilot.json` that does not carry
+  its ownership marker, and saves a one-time `.bak` copy.
+- Hook helper paths are single-quoted before being written into shell commands.
 
 ## Supported versions
 
-Pookify is pre-1.0; only the latest release/`main` receives fixes.
+The project is pre-1.0; only the latest release and `main` receive fixes.

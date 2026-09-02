@@ -1,22 +1,21 @@
 # Trademarks and attributions
 
-Pookify is an independent, unofficial, open-source project. It is not affiliated with, endorsed by, or sponsored by Anthropic or Apple. All trademarks are used nominatively, to describe what Pookify works with.
+Pookify Copilot is an independent, unofficial, open-source project. It is not affiliated with,
+endorsed by, or sponsored by GitHub or Apple.
 
 ## Trademarks
 
-- Claude, Claude Code, and the Claude "spark" logo are trademarks of Anthropic, PBC.
-- Apple, MacBook, macOS, and Dynamic Island are trademarks of Apple Inc., registered in the U.S. and other countries.
+- GitHub and GitHub Copilot are trademarks of GitHub, Inc.
+- Apple, MacBook, macOS, and Dynamic Island are trademarks of Apple Inc.
 
-Referential use of these marks does not imply any affiliation with, sponsorship by, or endorsement by their owners.
+These names are used only to describe compatibility. The small robot glyph is drawn in SwiftUI
+and is not a bundled GitHub logo asset. Referential use does not imply sponsorship or endorsement.
 
-## Bundled visual assets
+## Upstream project
 
-- The Claude spark, the resting Claude logo, and the "Clawd" crab artwork are bundled from [claude-status-bar](https://github.com/m1ckc3s/claude-status-bar) under the MIT License (© 2026 Mick Cesanek). The Claude name and spark logo are trademarks of Anthropic, PBC, used only to identify Claude Code.
-
-Full third-party license texts and required notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) (also shipped inside `Pookify.app`).
-
-If any rights holder objects to an asset above, open an issue and it will be removed or replaced promptly.
+This project is based on [Pookify](https://github.com/eyadhammouda/pookify), whose source is
+available under the MIT License. The original copyright notice remains in [LICENSE](LICENSE).
 
 ## License scope
 
-The MIT license in [LICENSE](LICENSE) applies to Pookify's source code only. It grants no rights to any third-party trademark, logo, or brand asset listed here. Those remain the property of their owners.
+The MIT License applies to the source code only and grants no rights in third-party trademarks.

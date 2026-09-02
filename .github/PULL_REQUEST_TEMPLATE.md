@@ -14,4 +14,4 @@
 - [ ] Matches the surrounding code style
 - [ ] Updated README/DEMO if behavior changed
 - [ ] Added a `CHANGELOG.md` entry under `[Unreleased]`
-- [ ] No new third-party dependencies (Pookify is dependency-free)
+- [ ] No new third-party dependencies (Pookify Copilot is dependency-free)

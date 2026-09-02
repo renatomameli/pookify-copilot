@@ -30,18 +30,14 @@ jobs:
 
       - name: Sanity-check the bundle
         run: |
-          test -x build/Pookify.app/Contents/MacOS/Pookify
-          test -x build/Pookify.app/Contents/MacOS/island-hook
-          plutil -lint build/Pookify.app/Contents/Info.plist
+          test -x "build/Pookify Copilot.app/Contents/MacOS/PookifyCopilot"
+          test -x "build/Pookify Copilot.app/Contents/MacOS/island-hook"
+          plutil -lint "build/Pookify Copilot.app/Contents/Info.plist"
           # the notices must ship inside the bundle (license requirement)
-          test -f build/Pookify.app/Contents/Resources/THIRD_PARTY_NOTICES.md
+          test -f "build/Pookify Copilot.app/Contents/Resources/THIRD_PARTY_NOTICES.md"
 
-      - name: Smoke-test the hook helper
-        run: |
-          # island-hook must never fail or hang, even on garbage input
-          echo 'not json' | ./build/Pookify.app/Contents/MacOS/island-hook claude prompt
-          echo '{}' | ./build/Pookify.app/Contents/MacOS/island-hook claude stop
-          echo '{"session_id":"ci-test","cwd":"/tmp"}' | ./build/Pookify.app/Contents/MacOS/island-hook claude session-end
+      - name: Smoke-test hooks
+        run: ./scripts/test.sh
 
   scripts:
     name: Lint shell scripts

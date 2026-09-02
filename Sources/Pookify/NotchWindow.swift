@@ -20,14 +20,18 @@ final class NotchPanel: NSPanel {
         isMovableByWindowBackground = false
         isMovable = false
         hidesOnDeactivate = false
+        becomesKeyOnlyIfNeeded = true
+        ignoresMouseEvents = false
+        acceptsMouseMovedEvents = true
         // Don't show in the window cycle / screenshots of windows.
         isExcludedFromWindowsMenu = true
     }
 
-    // NEVER take key status: becoming key would steal typing focus from the user's terminal or
-    // editor the moment they click the island. Mouse events (tap to pin, right-click menu) are
-    // delivered to a non-activating panel without key status, so nothing is lost.
-    override var canBecomeKey: Bool { false }
+    // SwiftUI buttons require a key-capable window to receive their first click reliably. The
+    // nonactivatingPanel style keeps the app itself from activating, and becomesKeyOnlyIfNeeded
+    // limits key status to controls that need it; selecting a row immediately reactivates the
+    // corresponding terminal.
+    override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
 }
 
@@ -109,7 +113,10 @@ final class NotchWindowController {
     /// aligns with the screen top (and thus the notch).
     private func panelFrame(for screen: NSScreen) -> NSRect {
         let w = screen.frame.width
-        let h: CGFloat = 240
+        // Reserve enough transparent host space for ten full rows plus the partial overflow row.
+        // Hit testing still only claims the pill itself, so the larger panel does not block apps.
+        let expandedStack = Theme.stackDropHeight(Theme.sessionRowsVisible + 1)
+        let h = min(screen.frame.height, max(240, ceil(model.topInset + expandedStack + 40)))
         return NSRect(x: screen.frame.minX,
                       y: screen.frame.maxY - h,
                       width: w,

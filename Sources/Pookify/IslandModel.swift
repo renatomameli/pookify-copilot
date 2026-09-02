@@ -8,7 +8,7 @@ import IslandCore
 @MainActor
 final class IslandModel: ObservableObject {
     @Published var isVisible = false
-    @Published var provider: Provider = .claude
+    @Published var provider: Provider = .copilot
     @Published var state: AgentState = .idle
     @Published var label: String = ""
     /// Small context under the label, e.g. the file basename ("App.swift"). Empty when none.
@@ -26,6 +26,10 @@ final class IslandModel: ObservableObject {
 
     /// The expanded drop-down is the session stack rather than the single-session layout.
     var isMulti: Bool { sessions.count >= 2 }
+    /// Finished sessions that are ready for the user while another session is still active.
+    var readyCount: Int {
+        sessions.filter { $0.state == .done || $0.state == .completed }.count
+    }
 
     /// Current height of the expanded drop-down (the stack grows with the session count).
     /// The window's interactive zone is sized from this, so it must cover the tallest case.
@@ -44,9 +48,6 @@ final class IslandModel: ObservableObject {
     /// reveal can NEVER play tall either — it slides out slim first, then expands downward
     /// (e.g. for a permission auto-open).
     @Published var opening = false
-    /// Which Claude working glyph to show: the Clawd crab (default), or the official spark.
-    @Published var claudeStyle: ClaudeStyle = .crab
-
     /// Whether the island is currently in its expanded presentation. `forceExpand` (a permission
     /// request) only triggers a one-shot auto-open in the controller; it isn't ORed in here, so the
     /// user can always collapse the island back down even while awaiting permission.
@@ -68,12 +69,11 @@ final class IslandModel: ObservableObject {
 
     /// Left-click on the island (toggles expand/collapse).
     var onActivate: (() -> Void)?
-    /// Click on a session row: pin that session to the island (click again to unpin).
+    /// Click on a session row: focus its terminal and pin it (click again to unpin).
     var onSelectSession: (String) -> Void = { _ in }
 
     // Context-menu (right-click) wiring, provided by the app controller.
     var onQuit: () -> Void = {}
-    var onChooseClaudeStyle: (ClaudeStyle) -> Void = { _ in }
     /// Pick which display shows the island; nil means automatic (notched screen, else main).
     var onChooseDisplay: (CGDirectDisplayID?) -> Void = { _ in }
 

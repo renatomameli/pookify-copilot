@@ -1,6 +1,7 @@
 import Foundation
 
-/// Reads and writes the per-session state files in `~/Library/Application Support/Pookify/state.d`.
+/// Reads and writes per-session state under
+/// `~/Library/Application Support/Pookify Copilot/state.d`.
 ///
 /// Writes are atomic (write to a temp file, then rename) so the app's poller never reads a
 /// half-written file. The file name is `<provider>-<sanitized session id>.json`.

@@ -6,13 +6,13 @@ import Foundation
 /// to inspect, back up, and fully remove. Nothing here is secret; these are just paths.
 public enum Island {
     /// Bundle identifier of the app (used by the helper to `open -g -b` it on session start).
-    public static let bundleID = "com.pookify.app"
+    public static let bundleID = "com.pookify.copilot"
 
     /// Human-facing app name.
-    public static let appName = "Pookify"
+    public static let appName = "Pookify Copilot"
 
     /// Mach-O executable name inside the bundle.
-    public static let executableName = "Pookify"
+    public static let executableName = "PookifyCopilot"
 
     /// Name of the compiled hook helper.
     public static let helperName = "island-hook"
@@ -20,17 +20,17 @@ public enum Island {
     /// Schema version stamped into each state file. Informational/diagnostic only: the reader is
     /// field-tolerant (`SessionSnapshot.init(from:)` decodes every field defensively and ignores
     /// unknown ones), so it is not gated on this number.
-    public static let stateSchema = 1
+    public static let stateSchema = 2
 
-    /// `~/Library/Application Support/Pookify`. ISLAND_SUPPORT_DIR overrides it (dev/tests only —
-    /// lets a test app instance run against an isolated state world instead of the real one).
+    /// `~/Library/Application Support/Pookify Copilot`. ISLAND_SUPPORT_DIR overrides it
+    /// (dev/tests only — lets a test app instance use isolated state).
     public static var supportDir: URL {
         if let p = ProcessInfo.processInfo.environment["ISLAND_SUPPORT_DIR"], !p.isEmpty {
             return URL(fileURLWithPath: p, isDirectory: true)
         }
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Application Support")
-        return base.appendingPathComponent("Pookify", isDirectory: true)
+        return base.appendingPathComponent("Pookify Copilot", isDirectory: true)
     }
 
     /// `.../state.d` — one JSON file per live session, the unit of state and the liveness marker.

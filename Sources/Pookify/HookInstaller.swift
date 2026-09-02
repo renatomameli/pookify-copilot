@@ -1,215 +1,214 @@
 import Foundation
 import IslandCore
 
-/// Wires the island into the AI tools by merging hook entries into their config files, pointing
-/// each hook at our compiled helper. Idempotent (re-running strips our old entries first), never
-/// clobbers other hooks, and backs up each file once before the first edit. Fully reversible
-/// via `uninstall()`.
+/// Installs one owned user-level hook file for GitHub Copilot CLI. Other hook files and settings
+/// are never edited. The configuration is idempotent and removable without a merge operation.
 enum HookInstaller {
+    private struct Event {
+        let name: String
+        let token: String
+        let matcher: String?
 
-    static let home = FileManager.default.homeDirectoryForCurrentUser
-    static var claudeDir: URL { home.appendingPathComponent(".claude", isDirectory: true) }
-    static var claudeSettings: URL { claudeDir.appendingPathComponent("settings.json") }
+        init(_ name: String, _ token: String, matcher: String? = nil) {
+            self.name = name
+            self.token = token
+            self.matcher = matcher
+        }
+    }
 
-    // event name in the tool  ->  token we pass to island-hook
-    static let claudeEvents: [(String, String)] = [
-        ("SessionStart", "session-start"),
-        ("UserPromptSubmit", "prompt"),
-        ("PreToolUse", "pre"),
-        ("PostToolUse", "post"),
-        ("PostToolUseFailure", "post-fail"),
-        ("PermissionRequest", "permission"),
-        ("PermissionDenied", "denied"),
-        ("Notification", "notify"),
-        ("SubagentStart", "subagent-start"),
-        ("SubagentStop", "subagent-stop"),
-        ("PreCompact", "compact"),
-        ("Stop", "stop"),
-        ("StopFailure", "stop-fail"),
-        ("SessionEnd", "session-end"),
+    enum InstallerError: LocalizedError {
+        case copilotHomeMissing(URL)
+        case bundledHelperMissing(URL)
+        case hookFileOwnedBySomeoneElse(URL)
+
+        var errorDescription: String? {
+            switch self {
+            case .copilotHomeMissing(let url):
+                return "GitHub Copilot CLI configuration was not found at \(url.path). Run `copilot` once, then retry."
+            case .bundledHelperMissing(let url):
+                return "The bundled hook helper is missing at \(url.path). Rebuild the app and retry."
+            case .hookFileOwnedBySomeoneElse(let url):
+                return "Refusing to overwrite \(url.path) because it is not owned by Pookify Copilot."
+            }
+        }
+    }
+
+    private static let fileManager = FileManager.default
+    private static let ownershipMarker = "POOKIFY_COPILOT_HOOK"
+    private static let installedVersionKey = "copilotHooksInstalledVersion"
+    private static let copilotHomeKey = "copilotHomePath"
+
+    static var copilotHome: URL {
+        if let path = ProcessInfo.processInfo.environment["COPILOT_HOME"], !path.isEmpty {
+            return URL(fileURLWithPath: (path as NSString).expandingTildeInPath,
+                       isDirectory: true)
+        }
+        if let path = UserDefaults.standard.string(forKey: copilotHomeKey), !path.isEmpty {
+            return URL(fileURLWithPath: path, isDirectory: true)
+        }
+        return fileManager.homeDirectoryForCurrentUser
+            .appendingPathComponent(".copilot", isDirectory: true)
+    }
+
+    static var hooksDir: URL {
+        copilotHome.appendingPathComponent("hooks", isDirectory: true)
+    }
+
+    static var hookFile: URL {
+        hooksDir.appendingPathComponent("pookify-copilot.json")
+    }
+
+    // Native Copilot hook names produce camelCase payload fields. permissionRequest is
+    // intentionally absent: it fires before every permission evaluation, even when no prompt is
+    // shown. notification only matches states that actually block on user attention.
+    private static let events: [Event] = [
+        Event("sessionStart", "session-start"),
+        Event("sessionEnd", "session-end"),
+        Event("userPromptSubmitted", "prompt"),
+        Event("preToolUse", "pre"),
+        Event("postToolUse", "post"),
+        Event("postToolUseFailure", "post-fail"),
+        Event("agentStop", "stop"),
+        Event("errorOccurred", "error"),
+        Event("subagentStart", "subagent-start"),
+        Event("subagentStop", "subagent-stop"),
+        Event("preCompact", "compact"),
+        Event("notification", "notify",
+              matcher: "permission_prompt|elicitation_dialog"),
     ]
 
-    // MARK: helper install
-
     /// Locate the helper shipped next to this executable (Contents/MacOS in a bundle, or the
-    /// build dir during development).
-    static var bundledHelper: URL {
-        let exeDir = (Bundle.main.executableURL ?? URL(fileURLWithPath: CommandLine.arguments[0]))
-            .deletingLastPathComponent()
-        return exeDir.appendingPathComponent(Island.helperName)
+    /// SwiftPM build directory during development).
+    private static var bundledHelper: URL {
+        let executableDirectory = (
+            Bundle.main.executableURL ?? URL(fileURLWithPath: CommandLine.arguments[0])
+        ).deletingLastPathComponent()
+        return executableDirectory.appendingPathComponent(Island.helperName)
     }
-
-    /// Copy the helper to the stable support-dir location so hook commands survive app updates
-    /// and the .app being moved. Returns the path hooks should call.
-    @discardableResult
-    static func installHelper() -> String {
-        Island.ensureDirs()
-        let dest = Island.installedHelper
-        let src = bundledHelper
-        let fm = FileManager.default
-        if fm.fileExists(atPath: src.path) {
-            try? fm.removeItem(at: dest)
-            do {
-                try fm.copyItem(at: src, to: dest)
-                try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: dest.path)
-                return dest.path
-            } catch {
-                NSLog("Pookify: could not copy the hook helper to \(dest.path): \(error.localizedDescription).")
-                // fall through to whatever stable copy already exists, or (last resort) the bundle.
-            }
-        }
-        if fm.fileExists(atPath: dest.path) { return dest.path }
-        // Last resort: wire hooks to the in-bundle helper. This works until the .app is moved, so
-        // warn rather than fail silently — the hook command would then point at a stale path.
-        NSLog("Pookify: hook helper not installed to its stable location; falling back to the in-bundle path \(src.path), which breaks if the app is moved.")
-        return src.path
-    }
-
-    // MARK: install / uninstall
 
     @discardableResult
-    static func installAll() -> [String] {
-        let helperPath = installHelper()
-        let fm = FileManager.default
-        var wired: [String] = []
-        // Only wire up Claude Code if its config directory already exists, so we never create
-        // config for (or write into the home of) a tool the user doesn't actually use. Claude
-        // Code creates ~/.claude on first run, so "you have the agent" maps to "dir exists".
-        if fm.fileExists(atPath: claudeDir.path) {
-            if mergeFile(at: claudeSettings, provider: .claude, events: claudeEvents, helperPath: helperPath) {
-                wired.append("Claude Code (~/.claude/settings.json)")
+    static func installAll() throws -> [String] {
+        guard fileManager.fileExists(atPath: copilotHome.path) else {
+            throw InstallerError.copilotHomeMissing(copilotHome)
+        }
+        let helperPath = try installHelper()
+        try writeHookFile(helperPath: helperPath)
+        UserDefaults.standard.set(currentVersion, forKey: installedVersionKey)
+        UserDefaults.standard.set(copilotHome.path, forKey: copilotHomeKey)
+        return ["GitHub Copilot CLI (\(hookFile.path))"]
+    }
+
+    static func uninstall() throws {
+        if fileManager.fileExists(atPath: hookFile.path) {
+            let contents = try String(contentsOf: hookFile, encoding: .utf8)
+            guard contents.contains(ownershipMarker) else {
+                throw InstallerError.hookFileOwnedBySomeoneElse(hookFile)
+            }
+            try fileManager.removeItem(at: hookFile)
+        }
+        for directory in [Island.stateDir, Island.binDir] {
+            if fileManager.fileExists(atPath: directory.path) {
+                try fileManager.removeItem(at: directory)
             }
         }
-        return wired
+        UserDefaults.standard.removeObject(forKey: installedVersionKey)
+        UserDefaults.standard.removeObject(forKey: copilotHomeKey)
     }
 
-    static func uninstall() {
-        _ = stripFile(at: claudeSettings)
-        // Remove our state + bin (leave backups in place for safety).
-        try? FileManager.default.removeItem(at: Island.stateDir)
-        try? FileManager.default.removeItem(at: Island.binDir)
-    }
-
-    /// Re-run on first launch and whenever the app version changes, so upgrades pick up hook
-    /// changes. Returns the list of wired targets if it ran.
+    /// Re-run on first launch and whenever the app version changes so upgrades pick up hook
+    /// changes. Installation failures are logged and retried on the next launch.
     @discardableResult
     static func ensureInstalledIfNeeded() -> [String]? {
-        let current = (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "dev"
-        let key = "installedVersion"
-        if UserDefaults.standard.string(forKey: key) == current { return nil }
-        let wired = installAll()
-        // Only record success once something was actually wired: if Claude Code isn't installed
-        // yet (~/.claude missing), keep trying on future launches, so installing Pookify first
-        // and Claude Code second still ends up connected.
-        if !wired.isEmpty {
-            UserDefaults.standard.set(current, forKey: key)
+        if UserDefaults.standard.string(forKey: installedVersionKey) == currentVersion,
+           fileManager.fileExists(atPath: hookFile.path) {
+            return nil
         }
-        return wired
-    }
-
-    // MARK: JSON merge
-
-    /// Wrap a string in single quotes for safe use as one shell word, escaping any embedded single
-    /// quote. Robust against spaces, `$`, backticks, quotes, etc. in the (home-derived) helper path.
-    private static func shellSingleQuoted(_ s: String) -> String {
-        "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'"
-    }
-
-    private static func command(helperPath: String, provider: Provider, token: String) -> String {
-        // provider.rawValue and token are fixed, known-safe ascii tokens; only the path is dynamic.
-        "\(shellSingleQuoted(helperPath)) \(provider.rawValue) \(token)"
-    }
-
-    /// Marker that identifies a hook command as ours, so re-installs/uninstalls only touch our entries.
-    private static var marker: String { "/Pookify/bin/\(Island.helperName)" }
-
-    /// Merge our hook entries into a JSON file's `hooks` object. Returns true on success.
-    @discardableResult
-    private static func mergeFile(at url: URL, provider: Provider,
-                                  events: [(String, String)], helperPath: String) -> Bool {
-        // Distinguish "no config yet" (safe to create) from "config exists but we can't parse it"
-        // (NOT safe to overwrite — that would erase the user's real settings). Only a genuinely
-        // absent/empty file is treated as an empty object.
-        let raw = try? Data(contentsOf: url)
-        let parsed = readJSONObject(at: url)
-        if let raw, !raw.isEmpty, parsed == nil {
-            backupOnce(url)
-            NSLog("Pookify: refusing to edit \(url.path) — it isn't a JSON object we can safely merge into. A backup is at \(url.lastPathComponent).bak-pookify; fix the file (or wire the hook manually), then use \"Reinstall hooks\".")
-            return false
-        }
-        backupOnce(url)
-        var root = parsed ?? [:]
-
-        // Never silently discard an existing "hooks" value of an unexpected shape.
-        if let existing = root["hooks"], !(existing is [String: Any]) {
-            NSLog("Pookify: refusing to edit \(url.path) — its \"hooks\" value is not a JSON object.")
-            return false
-        }
-        var hooks = root["hooks"] as? [String: Any] ?? [:]
-        for (event, token) in events {
-            var groups = hooks[event] as? [[String: Any]] ?? []
-            groups = stripOurGroups(groups)
-            let cmd = command(helperPath: helperPath, provider: provider, token: token)
-            groups.append(["hooks": [["type": "command", "command": cmd]]])
-            hooks[event] = groups
-        }
-        root["hooks"] = hooks
-        return writeJSONObject(root, to: url)
-    }
-
-    @discardableResult
-    private static func stripFile(at url: URL) -> Bool {
-        guard var root = readJSONObject(at: url), var hooks = root["hooks"] as? [String: Any] else { return false }
-        for (event, value) in hooks {
-            guard let groups = value as? [[String: Any]] else { continue }
-            let cleaned = stripOurGroups(groups)
-            if cleaned.isEmpty { hooks.removeValue(forKey: event) } else { hooks[event] = cleaned }
-        }
-        if hooks.isEmpty { root.removeValue(forKey: "hooks") } else { root["hooks"] = hooks }
-        return writeJSONObject(root, to: url)
-    }
-
-    /// Drop any hook group whose commands all point at our helper; trim ours out of mixed groups.
-    private static func stripOurGroups(_ groups: [[String: Any]]) -> [[String: Any]] {
-        groups.compactMap { group -> [String: Any]? in
-            var g = group
-            let inner = (g["hooks"] as? [[String: Any]]) ?? []
-            let kept = inner.filter { !(($0["command"] as? String ?? "").contains(marker)) }
-            if kept.isEmpty { return nil }
-            g["hooks"] = kept
-            return g
-        }
-    }
-
-    // MARK: file IO
-
-    private static func readJSONObject(at url: URL) -> [String: Any]? {
-        guard let data = try? Data(contentsOf: url),
-              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
-        return obj
-    }
-
-    private static func writeJSONObject(_ obj: [String: Any], to url: URL) -> Bool {
-        guard let data = try? JSONSerialization.data(withJSONObject: obj,
-                                                     options: [.prettyPrinted, .sortedKeys]) else { return false }
         do {
-            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(),
-                                                    withIntermediateDirectories: true)
-            var out = data
-            out.append(0x0A) // trailing newline
-            try out.write(to: url, options: .atomic)
-            return true
-        } catch { return false }
+            return try installAll()
+        } catch {
+            NSLog("Pookify Copilot: hook installation failed: \(error.localizedDescription)")
+            return nil
+        }
     }
 
-    private static func backupOnce(_ url: URL) {
-        let bak = url.appendingPathExtension("bak-pookify")
-        let fm = FileManager.default
-        guard fm.fileExists(atPath: url.path), !fm.fileExists(atPath: bak.path) else { return }
-        // Never snapshot a file that already contains our hooks — the backup exists to preserve
-        // the user's pristine config, and a Pookify-laden copy isn't that. (Happens when the
-        // first install created the file, so no backup was taken, and a reinstall runs later.)
-        if let s = try? String(contentsOf: url, encoding: .utf8), s.contains(marker) { return }
-        try? fm.copyItem(at: url, to: bak)
+    private static var currentVersion: String {
+        (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "dev"
+    }
+
+    @discardableResult
+    private static func installHelper() throws -> String {
+        Island.ensureDirs()
+        let source = bundledHelper
+        guard fileManager.isExecutableFile(atPath: source.path) else {
+            throw InstallerError.bundledHelperMissing(source)
+        }
+
+        let destination = Island.installedHelper
+        let temporary = destination.deletingLastPathComponent()
+            .appendingPathComponent("\(Island.helperName).\(ProcessInfo.processInfo.processIdentifier).tmp")
+        if fileManager.fileExists(atPath: temporary.path) {
+            try fileManager.removeItem(at: temporary)
+        }
+        try fileManager.copyItem(at: source, to: temporary)
+        try fileManager.setAttributes([.posixPermissions: 0o755],
+                                      ofItemAtPath: temporary.path)
+        if fileManager.fileExists(atPath: destination.path) {
+            try fileManager.removeItem(at: destination)
+        }
+        try fileManager.moveItem(at: temporary, to: destination)
+        return destination.path
+    }
+
+    private static func writeHookFile(helperPath: String) throws {
+        if fileManager.fileExists(atPath: hookFile.path) {
+            let contents = try String(contentsOf: hookFile, encoding: .utf8)
+            guard contents.contains(ownershipMarker) else {
+                try backupForeignFileOnce()
+                throw InstallerError.hookFileOwnedBySomeoneElse(hookFile)
+            }
+        }
+
+        try fileManager.createDirectory(
+            at: hooksDir,
+            withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700]
+        )
+
+        var hooks: [String: Any] = [:]
+        for event in events {
+            var entry: [String: Any] = [
+                "type": "command",
+                "bash": command(helperPath: helperPath, token: event.token),
+                "timeoutSec": 2,
+                "env": [ownershipMarker: "1"],
+            ]
+            if let matcher = event.matcher {
+                entry["matcher"] = matcher
+            }
+            hooks[event.name] = [entry]
+        }
+
+        let root: [String: Any] = ["version": 1, "hooks": hooks]
+        var data = try JSONSerialization.data(
+            withJSONObject: root,
+            options: [.prettyPrinted, .sortedKeys]
+        )
+        data.append(0x0A)
+        try data.write(to: hookFile, options: .atomic)
+        try fileManager.setAttributes([.posixPermissions: 0o600],
+                                      ofItemAtPath: hookFile.path)
+    }
+
+    private static func backupForeignFileOnce() throws {
+        let backup = hookFile.appendingPathExtension("bak")
+        guard !fileManager.fileExists(atPath: backup.path) else { return }
+        try fileManager.copyItem(at: hookFile, to: backup)
+    }
+
+    /// Wrap the helper path as one shell word. The explicit `|| true` is important because
+    /// Copilot treats a failed preToolUse command hook as a denial; a status display must fail open.
+    private static func command(helperPath: String, token: String) -> String {
+        let quotedPath = "'" + helperPath.replacingOccurrences(of: "'", with: "'\\''") + "'"
+        return "COPILOT_SESSION_PID=$PPID \(quotedPath) copilot \(token) || true"
     }
 }

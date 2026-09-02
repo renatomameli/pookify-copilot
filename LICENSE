@@ -1,6 +1,7 @@
 MIT License
 
 Copyright (c) 2026 Pookify authors
+Copyright (c) 2026 Renato Mameli
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -22,9 +23,8 @@ SOFTWARE.
 
 ----------------------------------------------------------------------------
 
-This MIT license applies to Pookify's source code only. It does not grant any
-rights in third-party trademarks, logos, or brand assets, including the Claude
-name and spark logo (Anthropic, PBC), the OpenAI name, "Codex", and OpenAI logo
-(OpenAI), and "Dynamic Island", "MacBook", and "macOS" (Apple Inc.). Those marks
-remain the property of their owners and are used nominatively only. See
-TRADEMARKS.md.
+This MIT license applies to Pookify Copilot's source code only. It does not grant any
+rights in third-party trademarks, logos, or brand assets, including GitHub and
+GitHub Copilot (GitHub, Inc.) and "Dynamic Island", "MacBook", and "macOS"
+(Apple Inc.). Those marks remain the property of their owners and are used
+nominatively only. See TRADEMARKS.md.

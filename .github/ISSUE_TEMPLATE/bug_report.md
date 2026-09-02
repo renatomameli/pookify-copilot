@@ -18,10 +18,11 @@ What you expected to happen instead.
 **Environment**
 - macOS version:
 - Mac model (notched? 14"/16" MBP, MacBook Air, or external display):
-- Claude Code version (terminal or VS Code extension):
-- Pookify version (or commit):
+- GitHub Copilot CLI version:
+- Pookify Copilot version (or commit):
 
 **State / logs (optional)**
-If relevant, run with `ISLAND_DEBUG=1` and attach `~/Library/Application Support/Pookify/hooks.log`,
-or the contents of `~/Library/Application Support/Pookify/state.d/` (these contain a project folder
-name and working directory — redact if needed).
+If relevant, run with `ISLAND_DEBUG=1` and attach
+`~/Library/Application Support/Pookify Copilot/hooks.log`, or the contents of
+`~/Library/Application Support/Pookify Copilot/state.d/` (these contain a project folder name and
+working directory; redact them if needed).

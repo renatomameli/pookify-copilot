@@ -6,6 +6,7 @@ import IslandCore
 /// polls (SwiftUI diffing, pinning).
 struct SessionInfo: Identifiable, Equatable {
     let id: String
+    var pid: Int32            // Copilot CLI process; its ancestry identifies the terminal app
     var provider: Provider
     var state: AgentState   // effective state (caps/lingers applied), never .idle here
     var label: String       // "Editing", "Thinking…", "Awaiting permission", …
@@ -34,25 +35,20 @@ enum SessionAggregator {
     /// How long a transient state stays on screen before the island collapses.
     static let doneLinger: TimeInterval = 2.5
     static let errorLinger: TimeInterval = 3.5
-    // Display caps: when a session stops updating (interrupt, closed extension tab) its last
+    // Display caps: when a session stops updating unexpectedly, its last
     // state must not stay on screen forever, so a quiet session goes *display-idle* after a
     // while — WITHOUT deleting its file, so a tool that finally reports back (a 10-minute build,
     // a long test run) resumes with its label and turn clock intact.
     // A tool that is still running (toolEndsAt == 0) gets a long window; quiet reasoning
     // (thinking / a finished tool) goes idle much sooner; permission may legitimately sit.
     static let permissionCap: TimeInterval = 7200
-    // Backstop only. A cancelled turn is detected deterministically from the transcript's
-    // interruption marker (see `interruptedAt`), so this never fires in normal use — it exists
-    // purely to eventually clear a true zombie (a turn that died leaving no marker and no process
-    // exit, e.g. a fresh session cancelled within a second, before anything was written). It is
-    // deliberately generous so a genuinely long silent think is NEVER hidden: liveness counts both
-    // hook writes and transcript writes, and this only bites after neither has moved for this long.
+    // Generous backstop for a turn that ends without an agentStop or sessionEnd hook. A later hook
+    // immediately revives the session, so a long-running tool can still report completion.
     static let workBackstopCap: TimeInterval = 900
-    // How long past its last update a session keeps the app alive (so it can quit when the VS
-    // Code extension host — whose pid outlives closed sessions — is all that remains).
+    // How long past its last update an idle session keeps the app alive.
     static let appHold: TimeInterval = 300
     // Hard reap: delete a file this old no matter what (protects against pid reuse and junk
-    // buildup from extension sessions that never fire session-end).
+    // buildup from sessions that never fire sessionEnd).
     static let reapCap: TimeInterval = 7200
 
     static func pidAlive(_ pid: Int32) -> Bool {
@@ -60,30 +56,13 @@ enum SessionAggregator {
         return kill(pid, 0) == 0 || errno == EPERM
     }
 
-    /// Modification time of the session's transcript, or 0 if none. The turn writes to its
-    /// transcript continuously while alive, so this is a liveness signal that survives the gaps
-    /// between hooks; it freezes the instant a turn is interrupted.
-    static func transcriptMTime(_ s: SessionSnapshot) -> Double {
-        guard !s.transcript.isEmpty,
-              let attrs = try? FileManager.default.attributesOfItem(atPath: s.transcript),
-              let m = attrs[.modificationDate] as? Date else { return 0 }
-        return m.timeIntervalSince1970
-    }
-
     /// The state a session effectively contributes right now.
     ///
-    /// A cancelled turn is caught by `interruptedAt` (deterministic, no timeout). The only time
-    /// caps here are generous backstops for a zombie that left no marker: a working session stays
-    /// alive as long as EITHER a hook fired or the transcript was written within the backstop.
-    ///
-    /// Known limitation (intentionally not handled): a Ctrl+C in the very first second or two,
-    /// before Claude Code writes anything, leaves no signal at all — no hook, no transcript, no
-    /// marker — so that turn can only clear on the backstop. Detecting it would require a short
-    /// timeout that also hides genuinely long silent thinks, which is worse. A cancel mid-turn
-    /// (once there's output) is caught fast by the marker; this only affects the instant-undo case.
+    /// Time caps are only zombie backstops. Copilot's agentStop and sessionEnd hooks normally
+    /// provide deterministic turn and process completion.
     static func effectiveState(_ s: SessionSnapshot, now: Double) -> AgentState {
         func aliveWithin(_ cap: TimeInterval) -> Bool {
-            now - max(s.ts, transcriptMTime(s)) <= cap
+            now - s.ts <= cap
         }
         switch s.state {
         case .thinking:
@@ -114,61 +93,11 @@ enum SessionAggregator {
         }
     }
 
-    private static let iso = ISO8601DateFormatter()
-    private static let isoFrac: ISO8601DateFormatter = {
-        let f = ISO8601DateFormatter(); f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]; return f
-    }()
-
-    /// When the session's turn was interrupted, as a unix timestamp, or nil if it wasn't.
-    ///
-    /// Claude Code writes an interruption entry to the transcript on Ctrl+C / stop / a denied tool,
-    /// and fires NO hook for it. So the transcript is the source of truth. We scan the tail for the
-    /// newest such entry and return its timestamp; the caller compares it to the turn's start, so a
-    /// marker from a PRIOR turn is ignored and a fresh prompt naturally supersedes it. No timeout is
-    /// involved — a turn is interrupted the instant the marker lands, and never otherwise.
-    static func interruptedAt(_ s: SessionSnapshot) -> Double? {
-        guard !s.transcript.isEmpty,
-              let fh = FileHandle(forReadingAtPath: s.transcript) else { return nil }
-        defer { try? fh.close() }
-        guard let size = try? fh.seekToEnd(), size > 0 else { return nil }
-        let window: UInt64 = 65536
-        try? fh.seek(toOffset: size > window ? size - window : 0)
-        guard let data = try? fh.readToEnd(), !data.isEmpty else { return nil }
-        let text = String(decoding: data, as: UTF8.self)
-        // Newest line last; scan backward for the first interruption entry.
-        for line in text.split(separator: "\n", omittingEmptySubsequences: true).reversed() {
-            guard isInterruptLine(line) else { continue }
-            guard let obj = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any],
-                  let ts = obj["timestamp"] as? String else { continue }
-            return (isoFrac.date(from: ts) ?? iso.date(from: ts))?.timeIntervalSince1970 ?? 0
-        }
-        return nil
-    }
-
-    /// Whether one transcript line is a genuine interruption entry. Mirrors the patterns Claude
-    /// Code writes (user "[Request interrupted…]" markers, an errored/interrupted tool result),
-    /// while a cheap substring pre-check keeps the common non-matching line fast.
-    private static func isInterruptLine<S: StringProtocol>(_ line: S) -> Bool {
-        if line.contains("Request interrupted by user"),
-           let obj = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any],
-           (obj["type"] as? String) == "user" {
-            let marker = "[Request interrupted by user"
-            let c = (obj["message"] as? [String: Any])?["content"]
-            if let str = c as? String { return str.hasPrefix(marker) }
-            if let blocks = c as? [[String: Any]] {
-                return blocks.contains { ($0["type"] as? String) == "text"
-                    && (($0["text"] as? String) ?? "").hasPrefix(marker) }
-            }
-        }
-        if line.contains("\"interrupted\":true") { return true }
-        return false
-    }
-
     /// Read all files, reap dead ones, and decide what to surface.
     static func evaluate(now: Double = Date().timeIntervalSince1970) -> IslandDecision {
         var live: [SessionSnapshot] = []
         for url in StateStore.listFiles() {
-            guard var snap = StateStore.read(url) else { continue }
+            guard let snap = StateStore.read(url) else { continue }
             // Delete a file only on hard evidence: its process died, or it is ancient. Mere
             // staleness hides the session (display-idle above) but keeps the file, preserving
             // turn-clock continuity for tools that go quiet for a long time.
@@ -176,15 +105,6 @@ enum SessionAggregator {
             if processGone || now - snap.ts > reapCap {
                 try? FileManager.default.removeItem(at: url)
                 continue
-            }
-            // A turn interrupted (Ctrl+C / stop / denied tool) after it began is dead now — the
-            // transcript's interruption marker says so, with no hook and no timeout. Collapse it to
-            // idle so the island retracts within a poll; the file stays, and the next prompt (a
-            // newer startedAt) revives it. Done once per session here, off the hot path.
-            if snap.startedAt > 0, let it = interruptedAt(snap), it >= snap.startedAt - 2 {
-                snap.state = .idle
-                snap.startedAt = 0
-                snap.toolEndsAt = 0
             }
             live.append(snap)
         }
@@ -220,6 +140,7 @@ enum SessionAggregator {
             let s = live[i]
             return SessionInfo(
                 id: s.sessionId,
+                pid: s.pid,
                 provider: s.provider,
                 state: eff,
                 // When a tool has lingered out to thinking, show "Thinking…" rather than the stale tool label.
