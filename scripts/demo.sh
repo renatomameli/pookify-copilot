@@ -47,7 +47,8 @@ stop_pid_file() {
 }
 
 live_pid() {
-  local file="$RUN/session.pid" pid=""
+  local key="${1:-default}" file pid=""
+  file="$RUN/session-$key.pid"
   [[ -f "$file" ]] && pid="$(<"$file")"
   if ! pid_alive "$pid"; then
     nohup sleep 100000 >/dev/null 2>&1 &
@@ -87,7 +88,7 @@ write_state() {
   local id="$1" project="$2" state="$3" label="$4" tool="$5" started_at="$6"
   local detail="${7:-}" now pid
   now="$(date +%s)"
-  pid="$(live_pid)"
+  pid="$(live_pid "$id")"
   printf '{"schema":2,"provider":"copilot","sessionId":"%s","state":"%s","label":"%s","tool":"%s","project":"%s","cwd":"%s","pid":%s,"startedAt":%s,"ts":%s,"toolEndsAt":0,"detail":"%s"}\n' \
     "$id" "$state" "$label" "$tool" "$project" "$(json_escape "$REPO")" \
     "$pid" "$started_at" "$now" "$detail" > "$SD/copilot-$id.json"
@@ -168,10 +169,10 @@ show_multi() {
   (( count < 2 )) && count=2
   (( count > 30 )) && count=30
   now="$(date +%s)"
-  pid="$(live_pid)"
   clear_states
 
   for ((i = 0; i < count; i++)); do
+    pid="$(live_pid "multi$i")"
     case $((i % 5)) in
       0) project="api-server"; state=tool; label=Editing; tool=edit; ago=45; detail="Routes.swift" ;;
       1) project="dashboard"; state=permission; label="Awaiting permission"; tool=bash; ago=130; detail="" ;;
@@ -199,7 +200,10 @@ stop_demo() {
     kill "$driver" 2>/dev/null || true
   fi
   stop_pid_file "$RUN/launched-app.pid"
-  stop_pid_file "$RUN/session.pid"
+  for session_pid_file in "$RUN"/session-*.pid; do
+    [[ -e "$session_pid_file" ]] || continue
+    stop_pid_file "$session_pid_file"
+  done
   rm -rf "${DEMO_ROOT:?}"
   echo "Demo stopped."
 }
