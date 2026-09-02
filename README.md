@@ -4,12 +4,19 @@
 
 The GitHub Copilot CLI dynamic island for your MacBook.
 
+<img src="docs/hero.png" alt="Pookify Copilot showing ten synthetic Copilot CLI sessions in an expanded macOS status island">
+
 </div>
 
 Pookify Copilot is an unofficial macOS notch app that shows what local Copilot CLI sessions
 are doing: thinking, reading, editing, running commands, delegating, waiting for permission,
 requesting input, finishing, or failing. Multiple sessions are sorted by urgency in an expandable
 stack.
+
+<p align="center">
+  <img src="docs/editing-state.png" alt="Expanded Pookify Copilot island showing an active editing operation and file name" width="49%">
+  <img src="docs/ready-count.png" alt="Collapsed Pookify Copilot island showing three completed sessions in its green ready badge" width="49%">
+</p>
 
 ## Requirements
 
@@ -53,6 +60,10 @@ terminal or IDE to the foreground while the closed bar continues following the m
 session. When one or more sessions finish while others are active, the closed island shows their
 count in a green badge. The badge remains visible after all work finishes until those Copilot
 sessions close or start another turn. Up to ten sessions are shown at once before scrolling.
+
+<p align="center">
+  <img src="docs/session-stack.png" alt="Expanded Pookify Copilot stack with ten synthetic sessions ordered by urgency" width="520">
+</p>
 
 ## Update
 
