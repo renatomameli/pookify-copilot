@@ -167,7 +167,7 @@ struct IslandPill: View {
     }
 
     @ViewBuilder private var rightStatus: some View {
-        if model.isMulti && model.state.isWorking && model.readyCount > 0 {
+        if model.readyCount > 0 && model.state != .permission && model.state != .error {
             Text("\(model.readyCount)")
             .font(.system(size: 10.5, weight: .bold).monospacedDigit())
             .foregroundStyle(.black.opacity(0.82))

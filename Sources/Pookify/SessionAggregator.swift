@@ -133,19 +133,12 @@ enum SessionAggregator {
         }
         live.append(contentsOf: newestByPID.values.map(\.snapshot))
 
-        // Effective state per session, then a visibility rule for finished ("completed") ones.
-        // A finished session stays on screen only while ANY other session is still active
-        // (working / permission / a transient done-or-error flash) — that's when "1 done, 1
-        // still going" is worth a glance. The moment nothing is active the completed ones go
-        // display-idle too and the island recedes, exactly as a single session always has:
-        // with one session the done flash plays and the notch goes dark, pixel-identical to
-        // the pre-stack behavior.
+        // Finished sessions stay visible until their process exits, sessionEnd removes them, or a
+        // new prompt overwrites their state. This keeps the ready count useful even after every
+        // running session has finished instead of retracting precisely when results are waiting.
         let effs = live.map { effectiveState($0, now: now) }
-        let anyActive = effs.contains { $0 != .idle && $0 != .completed }
         func displayState(_ i: Int) -> AgentState {
-            let e = effs[i]
-            if e == .completed, !anyActive { return .idle }
-            return e
+            effs[i]
         }
 
         // Sessions that are visibly doing something — or only went quiet moments ago — keep the

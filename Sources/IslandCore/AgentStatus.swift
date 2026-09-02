@@ -19,7 +19,7 @@ public enum AgentState: String, Codable, Sendable {
     case permission  // blocked, awaiting permission or user input
     case done        // a turn just finished (transient celebratory flash -> becomes .completed)
     case error       // a turn ended on an error (transient)
-    case completed   // a finished turn, retained while another session is active
+    case completed   // a finished turn, retained until the session closes or starts new work
 
     /// Higher = more important to surface when several sessions are live.
     public var priority: Int {

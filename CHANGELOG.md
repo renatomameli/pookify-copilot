@@ -12,6 +12,8 @@ All notable changes to Pookify Copilot are documented here. The format follows
   have completed.
 - Snapshots are deduplicated by Copilot process and delayed older hook events are ignored, keeping
   stale completed sessions from overriding current work.
+- Completed sessions now keep the ready-count bar visible after all active work finishes. The bar
+  clears when those Copilot sessions close or begin another turn.
 - The expanded session stack now shows ten complete rows before scrolling instead of three.
 
 ## [0.1.0]
