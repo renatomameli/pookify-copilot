@@ -68,9 +68,14 @@ send() {
   printf '%s' "$payload" | "$helper" copilot "$kind"
 }
 
+export COPILOT_SESSION_PID=$$
 send unknown 'not json'
+old_state="$root/support/state.d/copilot-old-session.json"
+send session-start '{"sessionId":"old-session","cwd":"/tmp/project"}'
+[[ -e "$old_state" ]] || fail "old session fixture was not created"
 send session-start '{"sessionId":"integration","cwd":"/tmp/project"}'
 assert_equal "$(jq -r .state "$state")" idle "sessionStart state"
+[[ ! -e "$old_state" ]] || fail "sessionStart did not remove an older session for the same process"
 
 send prompt '{"sessionId":"integration","cwd":"/tmp/project"}'
 assert_equal "$(jq -r .state "$state")" thinking "prompt state"
@@ -93,13 +98,17 @@ assert_equal "$(jq -r .label "$state")" "Recovering..." "recoverable error label
 send notify '{"sessionId":"integration","cwd":"/tmp/project","notification_type":"elicitation_dialog"}'
 assert_equal "$(jq -r .label "$state")" "Input requested" "elicitation label"
 
-send stop '{"sessionId":"integration","cwd":"/tmp/project"}'
-assert_equal "$(jq -r .state "$state")" "done" "agentStop state"
-
 send error '{"sessionId":"integration","cwd":"/tmp/project","recoverable":false}'
 assert_equal "$(jq -r .state "$state")" error "non-recoverable error state"
 
-send session-end '{"sessionId":"integration","cwd":"/tmp/project"}'
+event_ms="$((($(date +%s) + 5) * 1000))"
+send prompt "{\"sessionId\":\"integration\",\"cwd\":\"/tmp/project\",\"timestamp\":$event_ms}"
+send stop "{\"sessionId\":\"integration\",\"cwd\":\"/tmp/project\",\"timestamp\":$((event_ms - 1000))}"
+assert_equal "$(jq -r .state "$state")" thinking "stale agentStop state"
+send stop "{\"sessionId\":\"integration\",\"cwd\":\"/tmp/project\",\"timestamp\":$((event_ms + 1000))}"
+assert_equal "$(jq -r .state "$state")" "done" "agentStop state"
+
+send session-end "{\"sessionId\":\"integration\",\"cwd\":\"/tmp/project\",\"timestamp\":$((event_ms + 2000))}"
 [[ ! -e "$state" ]] || fail "sessionEnd did not remove state"
 
 COPILOT_HOME="$root/copilot" ISLAND_SUPPORT_DIR="$root/support" "$APP" --uninstall >/dev/null

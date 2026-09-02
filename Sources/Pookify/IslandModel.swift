@@ -21,8 +21,6 @@ final class IslandModel: ObservableObject {
     @Published var sessions: [SessionInfo] = []
     /// Which session the closed bar is showing (highlighted in the stack).
     @Published var displayedId: String = ""
-    /// Non-nil while the user has pinned a session (clicked a row); shown in the context menu.
-    @Published var pinnedId: String? = nil
 
     /// The expanded drop-down is the session stack rather than the single-session layout.
     var isMulti: Bool { sessions.count >= 2 }
@@ -69,7 +67,7 @@ final class IslandModel: ObservableObject {
 
     /// Left-click on the island (toggles expand/collapse).
     var onActivate: (() -> Void)?
-    /// Click on a session row: focus its terminal and pin it (click again to unpin).
+    /// Click on a session row: focus its terminal.
     var onSelectSession: (String) -> Void = { _ in }
 
     // Context-menu (right-click) wiring, provided by the app controller.

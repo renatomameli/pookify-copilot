@@ -6,10 +6,12 @@ All notable changes to Pookify Copilot are documented here. The format follows
 
 ## [Unreleased]
 
-- Clicking a session row now activates the terminal or IDE application that owns the corresponding
-  Copilot process while retaining the existing pin/unpin behavior.
-- The closed multi-session island shows a green check and ready-session count whenever one or more
-  sessions have completed.
+- Clicking a session row activates the terminal or IDE application that owns the corresponding
+  Copilot process without pinning the closed bar to that session.
+- The closed multi-session island shows a green ready-session count whenever one or more sessions
+  have completed.
+- Snapshots are deduplicated by Copilot process and delayed older hook events are ignored, keeping
+  stale completed sessions from overriding current work.
 - The expanded session stack now shows ten complete rows before scrolling instead of three.
 
 ## [0.1.0]

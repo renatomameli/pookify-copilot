@@ -74,9 +74,8 @@ These looping commands can be stopped with <kbd>Ctrl</kbd>+<kbd>C</kbd> or from 
 
 Up to ten sessions are shown without scrolling. Permission requests sort above active work, then
 newer turns sort above older ones. Click a row to
-focus its terminal and pin it to the closed bar; click it again to resume automatic urgency
-ordering. Demo sessions use synthetic processes, so terminal focusing is intended for real
-Copilot sessions.
+focus its terminal; the closed bar keeps following automatic urgency ordering. Demo sessions use
+synthetic processes, so terminal focusing is intended for real Copilot sessions.
 
 ## Hook-to-state mapping
 

@@ -46,6 +46,18 @@ func dictionary(_ keys: String...) -> [String: Any] {
 
 func now() -> Double { Date().timeIntervalSince1970 }
 
+func payloadTimestamp() -> Double {
+    if let number = value(["timestamp"]) as? NSNumber {
+        let raw = number.doubleValue
+        return raw > 10_000_000_000 ? raw / 1000 : raw
+    }
+    let raw = string("timestamp")
+    if !raw.isEmpty, let date = ISO8601DateFormatter().date(from: raw) {
+        return date.timeIntervalSince1970
+    }
+    return now()
+}
+
 let hookParentPID = getppid()
 let sessionPID: Int32 = {
     guard let raw = ProcessInfo.processInfo.environment["COPILOT_SESSION_PID"],
@@ -60,6 +72,7 @@ let sessionId: String = {
 let cwd = string("cwd")
 let project = cwd.isEmpty ? "" : (cwd as NSString).lastPathComponent
 let prev = StateStore.read(StateStore.fileURL(provider: provider, sessionId: sessionId))
+let eventAt = payloadTimestamp()
 
 let toolLingerSeconds = 1.9
 let debugOn = ProcessInfo.processInfo.environment["ISLAND_DEBUG"] == "1"
@@ -124,7 +137,7 @@ func writeState(_ state: AgentState, label: String, tool: String = "",
         cwd: cwd.isEmpty ? (prev?.cwd ?? "") : cwd,
         pid: sessionPID,
         startedAt: startedAt,
-        ts: now(),
+        ts: eventAt,
         toolEndsAt: toolEndsAt,
         detail: detail
     )
@@ -137,11 +150,24 @@ func turnStart() -> Double {
     return startedAt
 }
 
+// Command and asynchronous notification hooks can finish out of order. An event created before
+// the current snapshot must not overwrite newer activity (for example, a delayed agentStop
+// changing a newly-started turn back to Done).
+if let previous = prev, eventAt + 0.001 < previous.ts {
+    debugLog(
+        "[\(String(sessionId.prefix(8)))] ignored stale \(kind) event "
+        + "(\(eventAt) < \(previous.ts))"
+    )
+    exit(0)
+}
+
 switch kind {
 case "session-start":
+    StateStore.removeOtherSessions(provider: provider, pid: sessionPID, keeping: sessionId)
     writeState(.idle, label: "", startedAt: 0)
 
 case "prompt":
+    StateStore.removeOtherSessions(provider: provider, pid: sessionPID, keeping: sessionId)
     // Copilot does not expose a turn id, but this event fires exactly once for each submitted
     // prompt, making it the authoritative point at which to restart the turn clock.
     writeState(.thinking, label: "Thinking...", startedAt: now())

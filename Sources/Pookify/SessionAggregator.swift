@@ -3,7 +3,7 @@ import IslandCore
 
 /// One session as the UI shows it: its effective (display) state plus the strings the pill and
 /// the session stack render. `id` is the hook's session id, so a row keeps its identity across
-/// polls (SwiftUI diffing, pinning).
+/// polls (SwiftUI diffing and terminal activation).
 struct SessionInfo: Identifiable, Equatable {
     let id: String
     var pid: Int32            // Copilot CLI process; its ancestry identifies the terminal app
@@ -95,7 +95,7 @@ enum SessionAggregator {
 
     /// Read all files, reap dead ones, and decide what to surface.
     static func evaluate(now: Double = Date().timeIntervalSince1970) -> IslandDecision {
-        var live: [SessionSnapshot] = []
+        var candidates: [(url: URL, snapshot: SessionSnapshot)] = []
         for url in StateStore.listFiles() {
             guard let snap = StateStore.read(url) else { continue }
             // Delete a file only on hard evidence: its process died, or it is ancient. Mere
@@ -106,8 +106,32 @@ enum SessionAggregator {
                 try? FileManager.default.removeItem(at: url)
                 continue
             }
-            live.append(snap)
+            candidates.append((url, snap))
         }
+
+        // Switching or forking a session can leave an old session ID attached to the same live
+        // Copilot process. Keep only that process's newest snapshot so stale "Done" rows cannot
+        // survive beside its current working state.
+        var newestByPID: [Int32: (url: URL, snapshot: SessionSnapshot)] = [:]
+        var live = candidates.filter { $0.snapshot.pid <= 0 }.map(\.snapshot)
+        for candidate in candidates where candidate.snapshot.pid > 0 {
+            let pid = candidate.snapshot.pid
+            guard let existing = newestByPID[pid] else {
+                newestByPID[pid] = candidate
+                continue
+            }
+            let current = candidate.snapshot
+            let previous = existing.snapshot
+            let replace = current.ts > previous.ts
+                || (current.ts == previous.ts && current.sessionId > previous.sessionId)
+            if replace {
+                try? FileManager.default.removeItem(at: existing.url)
+                newestByPID[pid] = candidate
+            } else {
+                try? FileManager.default.removeItem(at: candidate.url)
+            }
+        }
+        live.append(contentsOf: newestByPID.values.map(\.snapshot))
 
         // Effective state per session, then a visibility rule for finished ("completed") ones.
         // A finished session stays on screen only while ANY other session is still active

@@ -168,17 +168,13 @@ struct IslandPill: View {
 
     @ViewBuilder private var rightStatus: some View {
         if model.isMulti && model.state.isWorking && model.readyCount > 0 {
-            HStack(spacing: 3) {
-                Image(systemName: "checkmark")
-                    .font(.system(size: 8, weight: .bold))
-                Text("\(model.readyCount)")
-                    .font(.system(size: 10.5, weight: .bold).monospacedDigit())
-            }
-            .foregroundStyle(Theme.green)
+            Text("\(model.readyCount)")
+            .font(.system(size: 10.5, weight: .bold).monospacedDigit())
+            .foregroundStyle(.black.opacity(0.82))
             .lineLimit(1)
             .padding(.horizontal, 6)
             .padding(.vertical, 2.5)
-            .background(Capsule().fill(Theme.green.opacity(0.16)))
+            .background(Capsule().fill(Theme.green))
             .accessibilityLabel("\(model.readyCount) sessions ready")
             .help("\(model.readyCount) \(model.readyCount == 1 ? "session" : "sessions") ready")
         } else if model.isMulti && model.state.isWorking {
@@ -336,10 +332,6 @@ struct IslandPill: View {
     }
 
     @ViewBuilder private var menuItems: some View {
-        if let pin = model.pinnedId, model.isMulti {
-            Button("Unpin — follow the busiest session") { model.onSelectSession(pin) }
-            Divider()
-        }
         if NSScreen.screens.count > 1 {
             Menu("Display") {
                 // Automatic owns the check whenever the preference isn't in effect — including a
@@ -409,8 +401,8 @@ private struct StackEdges: Equatable {
 }
 
 /// One session in the expanded stack: state dot · project · activity (+ file) · live timer.
-/// Clicking a row focuses its terminal and pins the session to the island (clicking the pinned
-/// one unpins). The row's tap gesture wins over the pill's expand/collapse toggle.
+/// Clicking a row focuses its terminal. The row's button wins over the pill's
+/// expand/collapse gesture.
 private struct SessionRow: View {
     let session: SessionInfo
     let isDisplayed: Bool

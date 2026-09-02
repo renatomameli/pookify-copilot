@@ -57,6 +57,19 @@ public enum StateStore {
         try? FileManager.default.removeItem(at: fileURL(provider: provider, sessionId: sessionId))
     }
 
+    /// A Copilot CLI process can switch or fork sessions without terminating. Only one main
+    /// session is current in that process, so remove snapshots left by earlier session IDs.
+    public static func removeOtherSessions(provider: Provider, pid: Int32, keeping sessionId: String) {
+        guard pid > 0 else { return }
+        for url in listFiles() {
+            guard let snapshot = read(url),
+                  snapshot.provider == provider,
+                  snapshot.pid == pid,
+                  snapshot.sessionId != sessionId else { continue }
+            try? FileManager.default.removeItem(at: url)
+        }
+    }
+
     /// All current state files (ignores in-flight `.tmp` files).
     public static func listFiles() -> [URL] {
         let fm = FileManager.default

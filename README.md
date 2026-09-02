@@ -49,10 +49,9 @@ become idle.
 Run as many local Copilot CLI sessions as you want. The closed island shows the session needing
 the most attention. Permission and input requests take priority and auto-expand once. Hover or
 click the island to open the full session stack. Clicking a row brings that session's existing
-terminal or IDE to the foreground and pins the row; click it again to resume automatic ordering.
-When one or more sessions finish while others are active, the closed island shows a green check
-and the number of sessions ready for review. Up to ten sessions are shown at once before the
-stack starts scrolling.
+terminal or IDE to the foreground while the closed bar continues following the most urgent
+session. When one or more sessions finish while others are active, the closed island shows their
+count in a green badge. Up to ten sessions are shown at once before the stack starts scrolling.
 
 ## Update
 
