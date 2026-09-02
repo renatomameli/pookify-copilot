@@ -229,31 +229,40 @@ struct IslandPill: View {
     }
 
     private var singleDrop: some View {
-        VStack(spacing: 4) {
-            if model.state.isWorking {
-                // Live "AI shimmer" sweeping across the current activity word + dots.
-                WorkingLabel(word: statusWord)
-            } else {
-                Text(statusTitle)
-                    .font(.system(size: 13.5, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
+        Button {
+            guard !model.displayedId.isEmpty else { return }
+            model.onSelectSession(model.displayedId)
+        } label: {
+            VStack(spacing: 4) {
+                if model.state.isWorking {
+                    // Live "AI shimmer" sweeping across the current activity word + dots.
+                    WorkingLabel(word: statusWord)
+                } else {
+                    Text(statusTitle)
+                        .font(.system(size: 13.5, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                }
+                Capsule()
+                    .fill(accentColor)
+                    .frame(width: 26, height: 2.5)
+                    .opacity(0.9)
+                if !model.detail.isEmpty {
+                    Text(model.detail)
+                        .font(.system(size: 10.5, weight: .regular))
+                        .foregroundStyle(.white.opacity(0.5))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
             }
-            Capsule()
-                .fill(accentColor)
-                .frame(width: 26, height: 2.5)
-                .opacity(0.9)
-            if !model.detail.isEmpty {
-                Text(model.detail)
-                    .font(.system(size: 10.5, weight: .regular))
-                    .foregroundStyle(.white.opacity(0.5))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-            }
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 16)
+            .padding(.top, 5)
+            .contentShape(Rectangle())
         }
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, 16)
-        .padding(.top, 5)
+        .buttonStyle(.plain)
+        .help("Open session terminal")
+        .accessibilityLabel("Open \(statusTitle) session terminal")
     }
 
     // MARK: session stack (2+ sessions — every session as a row, most urgent first)
