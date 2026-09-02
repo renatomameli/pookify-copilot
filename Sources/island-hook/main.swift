@@ -96,6 +96,10 @@ func debugLog(_ message: String) {
 
 func launchApp() {
     guard ProcessInfo.processInfo.environment["ISLAND_NO_LAUNCH"] != "1" else { return }
+    guard !FileManager.default.fileExists(atPath: Island.installLockFile.path) else {
+        debugLog("    skipped app launch while installation is in progress")
+        return
+    }
     let process = Process()
     process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
     process.arguments = ["-g", "-b", Island.bundleID]

@@ -139,24 +139,11 @@ struct IslandPill: View {
                 model.hovering = false
             }
         }
-        .onTapGesture(perform: handleTap)
         .contextMenu { menuItems }
         .animation(Theme.expand, value: expanded)
         .animation(Theme.expand, value: model.state)
         .animation(Theme.expand, value: model.showsTimer)
         .animation(Theme.expand, value: model.sessions.count)
-    }
-
-    private func handleTap() {
-        if model.sessions.count == 1, let session = model.sessions.first {
-            hoverWork?.cancel()
-            model.suppressHoverUntilExit = true
-            model.hovering = false
-            model.userExpanded = false
-            model.onSelectSession(session.id)
-        } else {
-            model.onActivate?()
-        }
     }
 
     // MARK: closed row (balanced, centered on the camera)
@@ -290,9 +277,10 @@ struct IslandPill: View {
         let scroll = ScrollView(.vertical) {
             VStack(spacing: Theme.sessionRowSpacing) {
                 ForEach(model.sessions) { session in
-                    SessionRow(session: session,
-                               isDisplayed: session.id == model.displayedId,
-                               select: { model.onSelectSession(session.id) })
+                    SessionRow(
+                        session: session,
+                        isDisplayed: session.id == model.displayedId
+                    )
                 }
             }
             .padding(.horizontal, 6)   // slim insets: rows need every point of width
@@ -427,51 +415,47 @@ private struct StackEdges: Equatable {
 private struct SessionRow: View {
     let session: SessionInfo
     let isDisplayed: Bool
-    let select: () -> Void
     @State private var hovering = false
 
     var body: some View {
-        Button(action: select) {
-            HStack(spacing: 7) {
-                Circle()
-                    .fill(dotColor)
-                    .frame(width: 6, height: 6)
-                Text(projectDisplay)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                    .layoutPriority(1)
-                // Activity + file name: the file name is the informative part and must stay whole.
-                // When both can't fit, the generic label drops out entirely so only useful context
-                // remains. A truly long file name truncates in the middle to preserve its extension.
-                Group {
-                    if session.detail.isEmpty {
-                        activityText
-                    } else {
-                        ViewThatFits(in: .horizontal) {
-                            HStack(spacing: 4) {
-                                activityText
-                                detailText
-                            }
+        HStack(spacing: 7) {
+            Circle()
+                .fill(dotColor)
+                .frame(width: 6, height: 6)
+            Text(projectDisplay)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .layoutPriority(1)
+            // Activity + file name: the file name is the informative part and must stay whole.
+            // When both can't fit, the generic label drops out entirely so only useful context
+            // remains. A truly long file name truncates in the middle to preserve its extension.
+            Group {
+                if session.detail.isEmpty {
+                    activityText
+                } else {
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 4) {
+                            activityText
                             detailText
                         }
+                        detailText
                     }
                 }
-                .layoutPriority(0.9)
-                Spacer(minLength: 4)
-                trailing
-                    .layoutPriority(1)
             }
-            .padding(.horizontal, 8)
-            .frame(maxWidth: .infinity)
-            .frame(height: Theme.sessionRowHeight)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(.white.opacity(isDisplayed ? 0.09 : hovering ? 0.05 : 0))
-            )
-            .contentShape(Rectangle())
+            .layoutPriority(0.9)
+            Spacer(minLength: 4)
+            trailing
+                .layoutPriority(1)
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, 8)
+        .frame(maxWidth: .infinity)
+        .frame(height: Theme.sessionRowHeight)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(.white.opacity(isDisplayed ? 0.09 : hovering ? 0.05 : 0))
+        )
+        .contentShape(Rectangle())
         .help("Open \(projectDisplay) terminal")
         .accessibilityLabel("Open \(projectDisplay) terminal, \(activityWord)")
         .onHover { hovering = $0 }

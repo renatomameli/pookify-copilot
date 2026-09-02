@@ -77,6 +77,9 @@ git pull
 ./scripts/install.sh
 ```
 
+The installer stops the running app before replacing it, then launches the new version. Copilot
+CLI only needs restarting when the generated hook configuration itself changes.
+
 ## Uninstall
 
 ```bash

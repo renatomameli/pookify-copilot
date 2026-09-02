@@ -51,6 +51,9 @@ public enum Island {
     /// self-quit; the app itself checks it on launch so only one instance owns the notch.
     public static var appPidFile: URL { supportDir.appendingPathComponent("app.pid") }
 
+    /// Suppresses hook-driven relaunches while the installer replaces the application bundle.
+    public static var installLockFile: URL { supportDir.appendingPathComponent("installing") }
+
     public static func ensureDirs() {
         // Owner-only (0700): the state files record the absolute cwd / project / model of each
         // session, so keep them out of reach of other local users on a shared machine.

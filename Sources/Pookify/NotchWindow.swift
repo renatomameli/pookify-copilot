@@ -164,17 +164,32 @@ final class NotchWindowController {
 
     /// Window-level `ignoresMouseEvents` is the only reliable way to pass clicks through to
     /// another application's fullscreen window. Global and local monitors cover movement both
-    /// outside and inside this app; the timer also handles a stationary pointer when the island
-    /// appears or changes size.
+    /// outside and inside this app. They also dispatch left clicks directly from the known pill
+    /// geometry because SwiftUI controls inside a nonactivating panel do not reliably receive
+    /// their action. The timer handles a stationary pointer when the island appears or changes.
     private func installMouseRouting() {
-        let mask: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDragged, .rightMouseDragged]
-        globalMouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: mask) { [weak self] _ in
+        let mask: NSEvent.EventTypeMask = [
+            .mouseMoved, .leftMouseDragged, .rightMouseDragged, .leftMouseDown,
+        ]
+        globalMouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: mask) { [weak self] event in
             DispatchQueue.main.async {
-                MainActor.assumeIsolated { self?.updateInteractiveZone() }
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    self.updateInteractiveZone()
+                    if event.type == .leftMouseDown {
+                        _ = self.routeLeftClick(atScreenPoint: NSEvent.mouseLocation)
+                    }
+                }
             }
         }
         localMouseMonitor = NSEvent.addLocalMonitorForEvents(matching: mask) { [weak self] event in
-            MainActor.assumeIsolated { self?.updateInteractiveZone() }
+            let handled = MainActor.assumeIsolated {
+                guard let self else { return false }
+                self.updateInteractiveZone()
+                guard event.type == .leftMouseDown, event.window === self.panel else { return false }
+                return self.routeLeftClick(atWindowPoint: event.locationInWindow)
+            }
+            if handled { return nil }
             return event
         }
         let timer = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in
@@ -182,6 +197,76 @@ final class NotchWindowController {
         }
         RunLoop.main.add(timer, forMode: .common)
         mouseTimer = timer
+    }
+
+    private func routeLeftClick(atScreenPoint point: NSPoint) -> Bool {
+        guard let panel else { return false }
+        return routeLeftClick(atWindowPoint: panel.convertPoint(fromScreen: point))
+    }
+
+    /// Handle only the visible top bar and visible session content. Transparent panel space never
+    /// reaches this method because it lies outside `interactiveRect`.
+    private func routeLeftClick(atWindowPoint point: NSPoint) -> Bool {
+        guard model.isVisible, let hosting else { return false }
+        let viewPoint = hosting.convert(point, from: nil)
+        guard hosting.interactiveRect.contains(viewPoint) else { return false }
+
+        let yFromTop = hosting.isFlipped ? viewPoint.y : hosting.bounds.height - viewPoint.y
+        if yFromTop <= model.topInset {
+            activateTopBar()
+            return true
+        }
+
+        guard model.isTall else { return false }
+        if !model.isMulti {
+            activateOnlySession()
+            return true
+        }
+
+        let contentY = yFromTop - model.topInset + sessionScrollOffset()
+        let rowY = contentY - 7 // session stack's top padding
+        guard rowY >= 0 else { return false }
+        let stride = Theme.sessionRowHeight + Theme.sessionRowSpacing
+        let index = Int(rowY / stride)
+        let withinRow = rowY - CGFloat(index) * stride
+        guard withinRow <= Theme.sessionRowHeight,
+              model.sessions.indices.contains(index) else { return false }
+
+        let session = model.sessions[index]
+        NSLog("Pookify Copilot: routed click to session row \(index), \(session.id).")
+        model.onSelectSession(session.id)
+        return true
+    }
+
+    private func activateTopBar() {
+        if model.sessions.count == 1 {
+            activateOnlySession()
+        } else {
+            model.onActivate?()
+        }
+    }
+
+    private func activateOnlySession() {
+        guard let session = model.sessions.first else { return }
+        model.suppressHoverUntilExit = true
+        model.hovering = false
+        model.userExpanded = false
+        model.onSelectSession(session.id)
+        updateInteractiveZone()
+    }
+
+    /// Account for rows beyond the tenth after the user scrolls the stack.
+    private func sessionScrollOffset() -> CGFloat {
+        guard let hosting, let scrollView = firstScrollView(in: hosting) else { return 0 }
+        return max(0, scrollView.contentView.bounds.minY)
+    }
+
+    private func firstScrollView(in view: NSView) -> NSScrollView? {
+        if let scrollView = view as? NSScrollView { return scrollView }
+        for child in view.subviews {
+            if let match = firstScrollView(in: child) { return match }
+        }
+        return nil
     }
 
     @objc private func screensChanged() { relocate() }

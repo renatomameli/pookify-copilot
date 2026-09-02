@@ -21,6 +21,12 @@ All notable changes to Pookify Copilot are documented here. The format follows
   so two open terminals always produce two selectable session entries.
 - Transparent panel areas now use window-level mouse pass-through, preventing the enlarged
   ten-session host panel from blocking clicks in fullscreen applications.
+- The top bar, multi-session rows, and single-session status now have independent click targets
+  rather than competing through an ancestor island gesture.
+- Session clicks are dispatched from AppKit using the visible row geometry, avoiding unreliable
+  SwiftUI actions in a nonactivating panel.
+- Installation now blocks hook-driven relaunches, terminates the previous process, and starts a
+  fresh app instance so upgrades cannot leave an old binary running in memory.
 - The expanded session stack now shows ten complete rows before scrolling instead of three.
 
 ## [0.1.0]
