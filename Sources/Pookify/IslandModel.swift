@@ -39,6 +39,9 @@ final class IslandModel: ObservableObject {
     /// The pointer is over the island (owned by the view; mirrored here so the controller can
     /// tell whether the pill is currently tall before hiding it).
     @Published var hovering = false
+    /// After opening a lone session, keep the island collapsed until the pointer leaves so the
+    /// action has visible feedback even when that terminal was already frontmost.
+    @Published var suppressHoverUntilExit = false
     /// True while the island is being hidden: forces the slim presentation regardless of
     /// hover/pin, so the retract animation can NEVER play while the pill is tall.
     @Published var collapsing = false

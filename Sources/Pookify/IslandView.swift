@@ -129,11 +129,13 @@ struct IslandPill: View {
         .onHover { isOver in
             hoverWork?.cancel()
             if isOver {
+                guard !model.suppressHoverUntilExit else { return }
                 // small intent delay so a passing pointer doesn't pop it open
                 let work = DispatchWorkItem { model.hovering = true }
                 hoverWork = work
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.12, execute: work)
             } else {
+                model.suppressHoverUntilExit = false
                 model.hovering = false
             }
         }
@@ -148,6 +150,7 @@ struct IslandPill: View {
     private func handleTap() {
         if model.sessions.count == 1, let session = model.sessions.first {
             hoverWork?.cancel()
+            model.suppressHoverUntilExit = true
             model.hovering = false
             model.userExpanded = false
             model.onSelectSession(session.id)
@@ -255,11 +258,18 @@ struct IslandPill: View {
                 .frame(width: 26, height: 2.5)
                 .opacity(0.9)
             if !model.detail.isEmpty {
-                Text(model.detail)
+                HStack(spacing: 4) {
+                    Text(model.detail)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Image(systemName: "arrow.up.forward.app")
+                }
+                .font(.system(size: 10.5, weight: .regular))
+                .foregroundStyle(.white.opacity(0.5))
+            } else {
+                Label("Open terminal", systemImage: "arrow.up.forward.app")
                     .font(.system(size: 10.5, weight: .regular))
                     .foregroundStyle(.white.opacity(0.5))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
             }
         }
         .frame(maxWidth: .infinity)

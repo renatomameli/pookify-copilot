@@ -15,7 +15,8 @@ All notable changes to Pookify Copilot are documented here. The format follows
 - Completed sessions now keep the ready-count bar visible after all active work finishes. The bar
   clears when those Copilot sessions close or begin another turn.
 - With one session remaining, clicking anywhere on the island opens its terminal and collapses
-  the panel as visual confirmation.
+  the panel as visual confirmation. Hover stays suppressed until the pointer exits, so this
+  feedback remains visible even when the target terminal was already frontmost.
 - The expanded session stack now shows ten complete rows before scrolling instead of three.
 
 ## [0.1.0]
