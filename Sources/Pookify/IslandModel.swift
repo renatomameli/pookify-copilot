@@ -54,8 +54,10 @@ final class IslandModel: ObservableObject {
     /// user can always collapse the island back down even while awaiting permission.
     var isExpanded: Bool { userExpanded }
 
-    /// The pill is (or may be) showing its tall presentation right now.
-    var isTall: Bool { (hovering || userExpanded || forceExpand) && !collapsing && !opening }
+    /// The pill is showing its tall presentation right now. `forceExpand` is only an edge signal
+    /// that calls `setExpanded(true)`; including it here would leave an invisible tall hit area
+    /// after the user manually collapses a permission prompt.
+    var isTall: Bool { (hovering || userExpanded) && !collapsing && !opening }
 
     /// Top inset (notch height, or menu-bar height on non-notched displays) so the pill tucks
     /// directly under the cutout. @Published so the pill re-lays-out when the display changes.

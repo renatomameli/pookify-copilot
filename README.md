@@ -111,6 +111,8 @@ To preview every state without installing hooks, see [DEMO.md](DEMO.md).
 - Supports local GitHub Copilot CLI sessions. It does not install hooks into the VS Code
   extension or Copilot cloud agent.
 - On a notched Mac, the island fuses with the hardware notch. Other Macs get a synthetic notch.
+- The transparent host window ignores mouse events outside the visible island, including over
+  fullscreen applications.
 - With several displays, right-click the island and use **Display** to move it immediately.
   **Automatic** returns it to the built-in notched display. The choice is remembered.
 - Terminal focusing follows the Copilot process to its owning macOS application. If several

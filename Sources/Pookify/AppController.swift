@@ -184,6 +184,7 @@ final class AppController: NSObject, NSApplicationDelegate {
 
     private func setExpanded(_ on: Bool) {
         if model.userExpanded != on { model.userExpanded = on }
+        windowController.refreshInteractivity()
         if on {
             if clickMonitor == nil {
                 // A click anywhere outside our own windows collapses the island.

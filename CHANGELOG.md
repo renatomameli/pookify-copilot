@@ -19,6 +19,8 @@ All notable changes to Pookify Copilot are documented here. The format follows
   feedback remains visible even when the target terminal was already frontmost.
 - Open Copilot sessions now remain in the stack as **Idle** between turns instead of disappearing,
   so two open terminals always produce two selectable session entries.
+- Transparent panel areas now use window-level mouse pass-through, preventing the enlarged
+  ten-session host panel from blocking clicks in fullscreen applications.
 - The expanded session stack now shows ten complete rows before scrolling instead of three.
 
 ## [0.1.0]
