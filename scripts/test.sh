@@ -94,7 +94,7 @@ send notify '{"sessionId":"integration","cwd":"/tmp/project","notification_type"
 assert_equal "$(jq -r .label "$state")" "Input requested" "elicitation label"
 
 send stop '{"sessionId":"integration","cwd":"/tmp/project"}'
-assert_equal "$(jq -r .state "$state")" done "agentStop state"
+assert_equal "$(jq -r .state "$state")" "done" "agentStop state"
 
 send error '{"sessionId":"integration","cwd":"/tmp/project","recoverable":false}'
 assert_equal "$(jq -r .state "$state")" error "non-recoverable error state"

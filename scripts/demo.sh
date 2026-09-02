@@ -113,7 +113,7 @@ resolve() {
     working)    LABEL="Working..."; TOOL=custom_tool ;;
     permission) STATE=permission; LABEL="Awaiting permission"; TOOL=bash ;;
     input)      STATE=permission; LABEL="Input requested"; TOOL=ask_user ;;
-    done)       STATE=done; LABEL="Done"; TOOL=""; AGO=0 ;;
+    "done")     STATE="done"; LABEL="Done"; TOOL=""; AGO=0 ;;
     error)      STATE=error; LABEL="Error"; TOOL=""; AGO=0 ;;
     *) return 1 ;;
   esac
@@ -153,7 +153,7 @@ play_story() {
   sleep 4
   write_state demo pookify-copilot tool "Running command" bash "$start"
   sleep 3
-  write_state demo pookify-copilot done Done "" 0
+  write_state demo pookify-copilot "done" "Done" "" 0
   sleep 2.5
   clear_states
   echo "Story finished."
@@ -206,7 +206,7 @@ stop_demo() {
 
 ACTIVITIES=(
   thinking reading searching running editing writing websearch webfetch planning
-  delegating mcp asking compacting working permission input done error
+  delegating mcp asking compacting working permission input "done" error
 )
 
 case "${1:-help}" in
@@ -239,7 +239,7 @@ case "${1:-help}" in
   finish)
     register_driver
     ensure_app
-    while true; do show running; sleep 3; show done; sleep 2.5; clear_states; sleep 2.5; done
+    while true; do show running; sleep 3; show "done"; sleep 2.5; clear_states; sleep 2.5; done
     ;;
   cycle)
     register_driver
