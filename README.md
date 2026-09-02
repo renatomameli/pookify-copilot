@@ -60,7 +60,7 @@ terminal or IDE to the foreground while the closed bar continues following the m
 session. When one or more sessions finish while others are active, the closed island shows their
 count in a green badge. The badge remains visible after all work finishes until those Copilot
 sessions close or start another turn. Up to ten sessions are shown at once before scrolling.
-When only one session remains, click its expanded status label to open that terminal.
+When only one session remains, click anywhere on the island to open that terminal.
 
 <p align="center">
   <img src="docs/session-stack.png" alt="Expanded Pookify Copilot stack with ten synthetic sessions ordered by urgency" width="520">

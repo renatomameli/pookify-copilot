@@ -137,12 +137,23 @@ struct IslandPill: View {
                 model.hovering = false
             }
         }
-        .onTapGesture { model.onActivate?() }
+        .onTapGesture(perform: handleTap)
         .contextMenu { menuItems }
         .animation(Theme.expand, value: expanded)
         .animation(Theme.expand, value: model.state)
         .animation(Theme.expand, value: model.showsTimer)
         .animation(Theme.expand, value: model.sessions.count)
+    }
+
+    private func handleTap() {
+        if model.sessions.count == 1, let session = model.sessions.first {
+            hoverWork?.cancel()
+            model.hovering = false
+            model.userExpanded = false
+            model.onSelectSession(session.id)
+        } else {
+            model.onActivate?()
+        }
     }
 
     // MARK: closed row (balanced, centered on the camera)
@@ -229,40 +240,31 @@ struct IslandPill: View {
     }
 
     private var singleDrop: some View {
-        Button {
-            guard !model.displayedId.isEmpty else { return }
-            model.onSelectSession(model.displayedId)
-        } label: {
-            VStack(spacing: 4) {
-                if model.state.isWorking {
-                    // Live "AI shimmer" sweeping across the current activity word + dots.
-                    WorkingLabel(word: statusWord)
-                } else {
-                    Text(statusTitle)
-                        .font(.system(size: 13.5, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-                }
-                Capsule()
-                    .fill(accentColor)
-                    .frame(width: 26, height: 2.5)
-                    .opacity(0.9)
-                if !model.detail.isEmpty {
-                    Text(model.detail)
-                        .font(.system(size: 10.5, weight: .regular))
-                        .foregroundStyle(.white.opacity(0.5))
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                }
+        VStack(spacing: 4) {
+            if model.state.isWorking {
+                // Live "AI shimmer" sweeping across the current activity word + dots.
+                WorkingLabel(word: statusWord)
+            } else {
+                Text(statusTitle)
+                    .font(.system(size: 13.5, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
             }
-            .frame(maxWidth: .infinity)
-            .padding(.horizontal, 16)
-            .padding(.top, 5)
-            .contentShape(Rectangle())
+            Capsule()
+                .fill(accentColor)
+                .frame(width: 26, height: 2.5)
+                .opacity(0.9)
+            if !model.detail.isEmpty {
+                Text(model.detail)
+                    .font(.system(size: 10.5, weight: .regular))
+                    .foregroundStyle(.white.opacity(0.5))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
         }
-        .buttonStyle(.plain)
-        .help("Open session terminal")
-        .accessibilityLabel("Open \(statusTitle) session terminal")
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 16)
+        .padding(.top, 5)
     }
 
     // MARK: session stack (2+ sessions — every session as a row, most urgent first)
