@@ -27,6 +27,8 @@ All notable changes to Pookify Copilot are documented here. The format follows
   SwiftUI actions in a nonactivating panel.
 - Installation now blocks hook-driven relaunches, terminates the previous process, and starts a
   fresh app instance so upgrades cannot leave an old binary running in memory.
+- Live Copilot sessions no longer disappear after two hours without a hook event; only stale
+  snapshots without a live process identity are age-reaped.
 - The expanded session stack now shows ten complete rows before scrolling instead of three.
 
 ## [0.1.0]

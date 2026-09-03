@@ -45,9 +45,10 @@ enum SessionAggregator {
     // Generous backstop for a turn that ends without an agentStop or sessionEnd hook. A later hook
     // immediately revives the session, so a long-running tool can still report completion.
     static let workBackstopCap: TimeInterval = 900
-    // Hard reap: delete a file this old no matter what (protects against pid reuse and junk
-    // buildup from sessions that never fire sessionEnd).
-    static let reapCap: TimeInterval = 7200
+    // Snapshots without a process identifier cannot prove liveness, so eventually reap them.
+    // A snapshot with a live Copilot PID must never age out: users routinely leave an idle
+    // terminal open for hours and still expect it to remain selectable.
+    static let orphanReapCap: TimeInterval = 7200
 
     static func pidAlive(_ pid: Int32) -> Bool {
         if pid <= 0 { return false }
@@ -96,11 +97,11 @@ enum SessionAggregator {
         var candidates: [(url: URL, snapshot: SessionSnapshot)] = []
         for url in StateStore.listFiles() {
             guard let snap = StateStore.read(url) else { continue }
-            // Delete a file only on hard evidence: its process died, or it is ancient. Mere
-            // staleness hides the session (display-idle above) but keeps the file, preserving
-            // turn-clock continuity for tools that go quiet for a long time.
+            // Delete a tracked process only on hard evidence that it died. The age cap applies
+            // exclusively to pid-less snapshots, where liveness cannot be established.
             let processGone = snap.pid > 0 && !pidAlive(snap.pid)
-            if processGone || now - snap.ts > reapCap {
+            let orphanExpired = snap.pid <= 0 && now - snap.ts > orphanReapCap
+            if processGone || orphanExpired {
                 try? FileManager.default.removeItem(at: url)
                 continue
             }

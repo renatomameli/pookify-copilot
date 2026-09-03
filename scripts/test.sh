@@ -141,12 +141,25 @@ printf '%s' '{"sessionId":"done-live","cwd":"/tmp/done"}' \
 printf '%s' '{"sessionId":"done-live","cwd":"/tmp/done"}' \
   | COPILOT_SESSION_PID="$done_pid" ISLAND_SUPPORT_DIR="$aggregate_support" \
     "$helper" copilot stop
+
+# A live idle Copilot process must remain selectable no matter how old its last hook event is.
+idle_state="$aggregate_support/state.d/copilot-idle-live.json"
+jq '.ts = now - 10800' "$idle_state" > "$idle_state.tmp"
+mv "$idle_state.tmp" "$idle_state"
+
+# In contrast, an old snapshot with no process identity is safe to reap.
+orphan_state="$aggregate_support/state.d/copilot-orphan.json"
+jq -n '{schema:2,provider:"copilot",sessionId:"orphan",state:"idle",label:"",
+  tool:"",project:"",cwd:"",pid:0,startedAt:0,ts:(now-10800),toolEndsAt:0,detail:""}' \
+  > "$orphan_state"
+
 sessions="$(ISLAND_SUPPORT_DIR="$aggregate_support" "$APP" --dump-sessions)"
 jq -e '
   length == 2
   and any(.[]; .id == "idle-live" and .state == "idle")
   and any(.[]; .id == "done-live" and .state == "done")
 ' <<< "$sessions" >/dev/null || fail "open idle session was omitted from aggregation"
+[[ ! -e "$orphan_state" ]] || fail "expired pid-less snapshot was not reaped"
 
 COPILOT_HOME="$root/copilot" ISLAND_SUPPORT_DIR="$root/support" "$APP" --uninstall >/dev/null
 [[ ! -e "$config" ]] || fail "uninstall did not remove hook file"
