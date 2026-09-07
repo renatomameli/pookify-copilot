@@ -169,15 +169,21 @@ struct IslandPill: View {
 
     @ViewBuilder private var rightStatus: some View {
         if model.readyCount > 0 && model.state != .permission && model.state != .error {
-            Text("\(model.readyCount)")
-            .font(.system(size: 10.5, weight: .bold).monospacedDigit())
+            HStack(spacing: 2) {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 7.5, weight: .black))
+                Text("\(model.readyCount)/\(model.sessions.count)")
+                    .font(.system(size: 9.5, weight: .bold).monospacedDigit())
+            }
             .foregroundStyle(.black.opacity(0.82))
             .lineLimit(1)
-            .padding(.horizontal, 6)
+            .padding(.horizontal, 5)
             .padding(.vertical, 2.5)
             .background(Capsule().fill(Theme.green))
-            .accessibilityLabel("\(model.readyCount) sessions ready")
-            .help("\(model.readyCount) \(model.readyCount == 1 ? "session" : "sessions") ready")
+            .accessibilityLabel(
+                "\(model.readyCount) sessions ready of \(model.sessions.count) open"
+            )
+            .help("\(model.readyCount) ready / \(model.sessions.count) open")
         } else if model.isMulti && model.state != .permission && model.state != .error {
             // Several sessions, several clocks — one timer would just be whichever session
             // happens to lead, which reads as wrong. With none ready, show how many are open;

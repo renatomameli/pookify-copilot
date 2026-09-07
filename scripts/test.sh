@@ -26,6 +26,7 @@ tmp_base="${TMPDIR:-/tmp}"
 root="$(mktemp -d "$tmp_base/pookify-copilot.XXXXXX")"
 idle_pid=""
 done_pid=""
+discovery_pid=""
 cleanup() {
   if [[ "$idle_pid" =~ ^[0-9]+$ ]]; then
     kill "$idle_pid" 2>/dev/null || true
@@ -34,6 +35,10 @@ cleanup() {
   if [[ "$done_pid" =~ ^[0-9]+$ ]]; then
     kill "$done_pid" 2>/dev/null || true
     wait "$done_pid" 2>/dev/null || true
+  fi
+  if [[ "$discovery_pid" =~ ^[0-9]+$ ]]; then
+    kill "$discovery_pid" 2>/dev/null || true
+    wait "$discovery_pid" 2>/dev/null || true
   fi
   rm -rf "${root:?}"
 }
@@ -153,13 +158,37 @@ jq -n '{schema:2,provider:"copilot",sessionId:"orphan",state:"idle",label:"",
   tool:"",project:"",cwd:"",pid:0,startedAt:0,ts:(now-10800),toolEndsAt:0,detail:""}' \
   > "$orphan_state"
 
-sessions="$(ISLAND_SUPPORT_DIR="$aggregate_support" "$APP" --dump-sessions)"
+sessions="$(
+  ISLAND_SUPPORT_DIR="$aggregate_support" \
+    ISLAND_PROCESS_DISCOVERY_ROOT="$root/no-processes" \
+    "$APP" --dump-sessions
+)"
 jq -e '
   length == 2
   and any(.[]; .id == "idle-live" and .state == "idle")
   and any(.[]; .id == "done-live" and .state == "done")
 ' <<< "$sessions" >/dev/null || fail "open idle session was omitted from aggregation"
 [[ ! -e "$orphan_state" ]] || fail "expired pid-less snapshot was not reaped"
+
+mkdir -p "$root/fake-bin"
+printf '%s\n' '#include <unistd.h>' 'int main(void) { sleep(30); return 0; }' \
+  > "$root/fake-copilot.c"
+cc "$root/fake-copilot.c" -o "$root/fake-bin/copilot"
+"$root/fake-bin/copilot" 30 &
+discovery_pid=$!
+sleep 0.2
+discovered_sessions="$(
+  ISLAND_SUPPORT_DIR="$root/discovery-support" \
+    ISLAND_PROCESS_DISCOVERY_ROOT="$root/fake-bin" \
+    "$APP" --dump-sessions
+)"
+jq -e --arg id "process-$discovery_pid" --argjson pid "$discovery_pid" '
+  length == 1
+  and .[0].id == $id
+  and .[0].pid == $pid
+  and .[0].state == "idle"
+' <<< "$discovered_sessions" >/dev/null \
+  || fail "live Copilot process without a hook snapshot was not discovered"
 
 COPILOT_HOME="$root/copilot" ISLAND_SUPPORT_DIR="$root/support" "$APP" --uninstall >/dev/null
 [[ ! -e "$config" ]] || fail "uninstall did not remove hook file"

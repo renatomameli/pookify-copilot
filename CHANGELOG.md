@@ -29,6 +29,10 @@ All notable changes to Pookify Copilot are documented here. The format follows
   fresh app instance so upgrades cannot leave an old binary running in memory.
 - Live Copilot sessions no longer disappear after two hours without a hook event; only stale
   snapshots without a live process identity are age-reaped.
+- Missing hook snapshots are reconstructed from live interactive Copilot CLI processes as Idle,
+  so every open terminal remains visible and selectable.
+- Process fallback accepts official GitHub Copilot npm and Homebrew install paths only.
+- The green collapsed badge now shows `ready/open` instead of only the ready count.
 - The expanded session stack now shows ten complete rows before scrolling instead of three.
 
 ## [0.1.0]

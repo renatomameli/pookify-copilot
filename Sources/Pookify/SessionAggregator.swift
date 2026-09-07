@@ -132,6 +132,14 @@ enum SessionAggregator {
         }
         live.append(contentsOf: newestByPID.values.map(\.snapshot))
 
+        // A live interactive Copilot process may have no snapshot because the CLI emitted
+        // sessionEnd while its terminal stayed open, or because hooks were loaded after it
+        // started. Keep it selectable as Idle until a hook snapshot for that PID reappears.
+        let trackedPIDs = Set(live.lazy.map(\.pid).filter { $0 > 0 })
+        live.append(contentsOf: CopilotProcessDiscovery.snapshots(now: now).filter {
+            !trackedPIDs.contains($0.pid)
+        })
+
         // Finished sessions stay visible until their process exits, sessionEnd removes them, or a
         // new prompt overwrites their state. This keeps the ready count useful even after every
         // running session has finished instead of retracting precisely when results are waiting.
