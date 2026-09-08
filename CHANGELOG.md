@@ -33,6 +33,8 @@ All notable changes to Pookify Copilot are documented here. The format follows
   so every open terminal remains visible and selectable.
 - Process fallback accepts official GitHub Copilot npm and Homebrew install paths only.
 - The green collapsed badge now shows `ready/open` instead of only the ready count.
+- Right-click now opens a native AppKit context menu through the window router, restoring reliable
+  Display and Quit actions in the nonactivating overlay.
 - The expanded session stack now shows ten complete rows before scrolling instead of three.
 
 ## [0.1.0]

@@ -139,7 +139,6 @@ struct IslandPill: View {
                 model.hovering = false
             }
         }
-        .contextMenu { menuItems }
         .animation(Theme.expand, value: expanded)
         .animation(Theme.expand, value: model.state)
         .animation(Theme.expand, value: model.showsTimer)
@@ -344,43 +343,6 @@ struct IslandPill: View {
             .animation(.easeOut(duration: 0.18), value: fogTop)
             .animation(.easeOut(duration: 0.18), value: fogBottom)
         )
-    }
-
-    @ViewBuilder private var menuItems: some View {
-        if NSScreen.screens.count > 1 {
-            Menu("Display") {
-                // Automatic owns the check whenever the preference isn't in effect — including a
-                // saved display that's currently disconnected, so the menu never shows no choice.
-                Button((NSScreen.preferredDisplayConnected ? "" : "✓ ") + "Automatic") { chooseDisplay(nil) }
-                Divider()
-                ForEach(NSScreen.screens, id: \.self) { screen in
-                    if let id = screen.displayID {
-                        Button((NSScreen.preferredDisplayID == id ? "✓ " : "") + screenLabel(screen)) {
-                            chooseDisplay(id)
-                        }
-                    }
-                }
-            }
-        }
-        Divider()
-        Button("Quit") { model.onQuit() }
-    }
-
-    /// A human-readable menu label for a display, marking the built-in (notched) and primary
-    /// screens so identically-named externals stay distinguishable. (`screens.first` is the
-    /// primary display — NSScreen.main is merely the one with keyboard focus, which changes
-    /// with whatever app is frontmost.)
-    private func screenLabel(_ screen: NSScreen) -> String {
-        var name = screen.localizedName
-        if screen.hasNotch { name += " (built-in)" }
-        else if screen == NSScreen.screens.first { name += " (main)" }
-        return name
-    }
-
-    private func chooseDisplay(_ id: CGDirectDisplayID?) {
-        hoverWork?.cancel()
-        model.hovering = false
-        model.onChooseDisplay(id)
     }
 
     private var accentColor: Color {

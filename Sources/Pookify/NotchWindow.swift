@@ -1,4 +1,5 @@
 import AppKit
+import CoreGraphics
 import SwiftUI
 
 /// A borderless panel that floats over the notch on every Space, above the menu bar, without
@@ -40,10 +41,22 @@ final class NotchPanel: NSPanel {
 /// guard while the window is interactive.
 final class PassthroughHostingView<Content: View>: NSHostingView<Content> {
     var interactiveRect: CGRect = .zero
+    var contextMenuProvider: (() -> NSMenu?)?
 
     override func hitTest(_ point: NSPoint) -> NSView? {
         guard interactiveRect.contains(point) else { return nil }
+        // SwiftUI's internal views do not reliably surface right-clicks in a nonactivating panel.
+        // Claim that event at the AppKit hosting boundary and open the native menu directly.
+        if NSApp.currentEvent?.type == .rightMouseDown { return self }
         return super.hitTest(point)
+    }
+
+    override func rightMouseDown(with event: NSEvent) {
+        guard let menu = contextMenuProvider?() else {
+            super.rightMouseDown(with: event)
+            return
+        }
+        NSMenu.popUpContextMenu(menu, with: event, for: self)
     }
 
     /// Deliver the first click even though the app is never active (the panel never becomes
@@ -53,7 +66,7 @@ final class PassthroughHostingView<Content: View>: NSHostingView<Content> {
 
 /// Owns the panel + hosting view and keeps the island positioned on the correct screen.
 @MainActor
-final class NotchWindowController {
+final class NotchWindowController: NSObject {
     private let model: IslandModel
     private var panel: NotchPanel?
     private var hosting: PassthroughHostingView<IslandRootView>?
@@ -64,6 +77,7 @@ final class NotchWindowController {
 
     init(model: IslandModel) {
         self.model = model
+        super.init()
         // Register once, up front — independent of whether the first install() finds a screen — so a
         // display connecting later (e.g. app launched before screens settled) still builds the panel.
         NotificationCenter.default.addObserver(
@@ -78,6 +92,11 @@ final class NotchWindowController {
 
         let root = IslandRootView(model: model)
         let hosting = PassthroughHostingView(rootView: root)
+        hosting.contextMenuProvider = { [weak self] in
+            guard let self else { return nil }
+            NSLog("Pookify Copilot: opening context menu from hosting view.")
+            return self.contextMenu()
+        }
         hosting.translatesAutoresizingMaskIntoConstraints = true
         hosting.frame = NSRect(origin: .zero, size: frame.size)
         hosting.layer?.isOpaque = false
@@ -170,6 +189,7 @@ final class NotchWindowController {
     private func installMouseRouting() {
         let mask: NSEvent.EventTypeMask = [
             .mouseMoved, .leftMouseDragged, .rightMouseDragged, .leftMouseDown,
+            .rightMouseDown,
         ]
         globalMouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: mask) { [weak self] event in
             DispatchQueue.main.async {
@@ -178,6 +198,8 @@ final class NotchWindowController {
                     self.updateInteractiveZone()
                     if event.type == .leftMouseDown {
                         _ = self.routeLeftClick(atScreenPoint: NSEvent.mouseLocation)
+                    } else if event.type == .rightMouseDown {
+                        _ = self.routeContextMenu(atScreenPoint: NSEvent.mouseLocation)
                     }
                 }
             }
@@ -186,8 +208,15 @@ final class NotchWindowController {
             let handled = MainActor.assumeIsolated {
                 guard let self else { return false }
                 self.updateInteractiveZone()
-                guard event.type == .leftMouseDown, event.window === self.panel else { return false }
-                return self.routeLeftClick(atWindowPoint: event.locationInWindow)
+                guard event.window === self.panel else { return false }
+                switch event.type {
+                case .leftMouseDown:
+                    return self.routeLeftClick(atWindowPoint: event.locationInWindow)
+                case .rightMouseDown:
+                    return self.routeContextMenu(atWindowPoint: event.locationInWindow)
+                default:
+                    return false
+                }
             }
             if handled { return nil }
             return event
@@ -202,6 +231,92 @@ final class NotchWindowController {
     private func routeLeftClick(atScreenPoint point: NSPoint) -> Bool {
         guard let panel else { return false }
         return routeLeftClick(atWindowPoint: panel.convertPoint(fromScreen: point))
+    }
+
+    private func routeContextMenu(atScreenPoint point: NSPoint) -> Bool {
+        guard let panel else { return false }
+        return routeContextMenu(atWindowPoint: panel.convertPoint(fromScreen: point))
+    }
+
+    private func routeContextMenu(atWindowPoint point: NSPoint) -> Bool {
+        guard model.isVisible, let hosting else { return false }
+        let viewPoint = hosting.convert(point, from: nil)
+        guard hosting.interactiveRect.contains(viewPoint) else { return false }
+
+        NSLog("Pookify Copilot: opening context menu.")
+        contextMenu().popUp(positioning: nil, at: viewPoint, in: hosting)
+        return true
+    }
+
+    private func contextMenu() -> NSMenu {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+
+        if NSScreen.screens.count > 1 {
+            let displayItem = NSMenuItem(title: "Display", action: nil, keyEquivalent: "")
+            let displayMenu = NSMenu(title: "Display")
+            displayMenu.autoenablesItems = false
+
+            let automatic = NSMenuItem(
+                title: "Automatic",
+                action: #selector(selectDisplay(_:)),
+                keyEquivalent: ""
+            )
+            automatic.target = self
+            automatic.representedObject = NSNumber(value: 0)
+            automatic.state = NSScreen.preferredDisplayConnected ? .off : .on
+            automatic.isEnabled = true
+            displayMenu.addItem(automatic)
+            displayMenu.addItem(.separator())
+
+            for screen in NSScreen.screens {
+                guard let displayID = screen.displayID else { continue }
+                let item = NSMenuItem(
+                    title: screenLabel(screen),
+                    action: #selector(selectDisplay(_:)),
+                    keyEquivalent: ""
+                )
+                item.target = self
+                item.representedObject = NSNumber(value: displayID)
+                item.state = NSScreen.preferredDisplayID == displayID ? .on : .off
+                item.isEnabled = true
+                displayMenu.addItem(item)
+            }
+            displayItem.submenu = displayMenu
+            displayItem.isEnabled = true
+            menu.addItem(displayItem)
+        }
+
+        menu.addItem(.separator())
+        let quit = NSMenuItem(
+            title: "Quit Pookify Copilot",
+            action: #selector(quitFromMenu(_:)),
+            keyEquivalent: ""
+        )
+        quit.target = self
+        quit.isEnabled = true
+        menu.addItem(quit)
+        return menu
+    }
+
+    private func screenLabel(_ screen: NSScreen) -> String {
+        var name = screen.localizedName
+        if screen.hasNotch {
+            name += " (built-in)"
+        } else if screen == NSScreen.screens.first {
+            name += " (main)"
+        }
+        return name
+    }
+
+    @objc private func selectDisplay(_ sender: NSMenuItem) {
+        let rawValue = (sender.representedObject as? NSNumber)?.uint32Value ?? 0
+        model.hovering = false
+        model.onChooseDisplay(rawValue == 0 ? nil : CGDirectDisplayID(rawValue))
+    }
+
+    @objc private func quitFromMenu(_ sender: NSMenuItem) {
+        model.onQuit()
     }
 
     /// Handle only the visible top bar and visible session content. Transparent panel space never
