@@ -10,6 +10,8 @@ import IslandCore
 struct SlotSessionRow: View {
     let session: SessionInfo
     let isWinningLine: Bool
+    /// The pointer is over this row (tracked by the AppKit router).
+    let isHovered: Bool
     /// Changes whenever the machine spins; each reel then drops in and stops in sequence.
     let spinToken: Int
 
@@ -17,11 +19,13 @@ struct SlotSessionRow: View {
     private let resultWidth: CGFloat = 42
     private let activityWidth: CGFloat = 112
 
+    private var hovering: Bool { isHovered }
+
     var body: some View {
         HStack(spacing: 3) {
-            WinMarker(symbol: "arrowtriangle.right.fill", visible: isWinningLine)
+            WinMarker(symbol: "arrowtriangle.right.fill", visible: isWinningLine || hovering)
                 .frame(width: gutter)
-            ReelCell(outline: nil, spinToken: spinToken, stopDelay: 0) {
+            ReelCell(outline: nil, lit: hovering, spinToken: spinToken, stopDelay: 0) {
                 HStack(spacing: 4) {
                     Circle()
                         .fill(dotColor)
@@ -35,25 +39,29 @@ struct SlotSessionRow: View {
                 }
                 .padding(.horizontal, 6)
             }
-            ReelCell(outline: activityOutline, spinToken: spinToken, stopDelay: 0.12) {
+            ReelCell(outline: activityOutline, lit: hovering, spinToken: spinToken, stopDelay: 0.12) {
                 ActivityReel(word: activityWord, tone: tone, flashRate: flashRate)
             }
             .frame(width: activityWidth)
-            ReelCell(outline: nil, spinToken: spinToken, stopDelay: 0.24) {
+            ReelCell(outline: nil, lit: hovering, spinToken: spinToken, stopDelay: 0.24) {
                 result
             }
             .frame(width: resultWidth)
-            WinMarker(symbol: "arrowtriangle.left.fill", visible: isWinningLine)
+            WinMarker(symbol: "arrowtriangle.left.fill", visible: isWinningLine || hovering)
                 .frame(width: gutter)
         }
         .frame(height: Theme.sessionRowHeight)
+        .brightness(hovering ? 0.12 : 0)
         .background(
             RoundedRectangle(cornerRadius: 7)
-                .fill(Theme.gold.opacity(isWinningLine ? 0.16 : 0))
+                .fill(Theme.gold.opacity(isWinningLine ? 0.16 : hovering ? 0.12 : 0))
+                .shadow(color: Theme.flame.opacity(hovering ? 0.7 : 0), radius: 6)
         )
+        .scaleEffect(hovering ? 1.03 : 1)
         .contentShape(Rectangle())
         .help(helpText)
         .accessibilityLabel("Open \(projectDisplay) terminal, \(activityWord)")
+        .animation(.spring(response: 0.22, dampingFraction: 0.6), value: hovering)
         .animation(.easeOut(duration: 0.2), value: isWinningLine)
     }
 
@@ -159,6 +167,7 @@ private struct WinMarker: View {
 /// reel so the three stop left-to-right like a real machine.
 private struct ReelCell<Content: View>: View {
     let outline: Color?
+    var lit = false
     let spinToken: Int
     let stopDelay: Double
     @ViewBuilder var content: Content
@@ -190,7 +199,8 @@ private struct ReelCell<Content: View>: View {
                     shape.strokeBorder(outline, lineWidth: 1.4)
                         .shadow(color: outline, radius: 3)
                 } else {
-                    shape.strokeBorder(Theme.goldGradient, lineWidth: 1.2)
+                    shape.strokeBorder(Theme.goldGradient, lineWidth: lit ? 1.8 : 1.2)
+                        .shadow(color: Theme.flame.opacity(lit ? 0.9 : 0), radius: 3)
                 }
             }
             .clipShape(shape)

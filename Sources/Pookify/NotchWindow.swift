@@ -74,6 +74,7 @@ final class NotchWindowController: NSObject {
     private var localMouseMonitor: Any?
     private var mouseTimer: Timer?
     private var lastPointerInside: Bool?
+    private var hoverIntent: DispatchWorkItem?
 
     init(model: IslandModel) {
         self.model = model
@@ -174,9 +175,63 @@ final class NotchWindowController: NSObject {
         if panel.ignoresMouseEvents != shouldIgnoreMouse {
             panel.ignoresMouseEvents = shouldIgnoreMouse
         }
-        if !pointerInside, model.hovering {
-            model.hovering = false
+        updateHover(pointerInside: pointerInside, viewPoint: viewPoint)
+    }
+
+    /// Hover is derived from the pointer position here rather than SwiftUI's `onHover`. The panel
+    /// only starts accepting mouse events once the pointer is already inside the island, so AppKit
+    /// tracking areas frequently never report an "entered" event and the island would not expand.
+    private func updateHover(pointerInside: Bool, viewPoint: CGPoint) {
+        if pointerInside {
+            if !model.hovering, !model.suppressHoverUntilExit, hoverIntent == nil {
+                // A short intent delay so a pointer merely passing the menu bar doesn't pop it open.
+                let work = DispatchWorkItem { [weak self] in
+                    MainActor.assumeIsolated {
+                        guard let self else { return }
+                        self.hoverIntent = nil
+                        guard self.lastPointerInside == true,
+                              !self.model.suppressHoverUntilExit else { return }
+                        self.model.hovering = true
+                        self.updateInteractiveZone()
+                    }
+                }
+                hoverIntent = work
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.12, execute: work)
+            }
+        } else {
+            hoverIntent?.cancel()
+            hoverIntent = nil
+            if model.suppressHoverUntilExit { model.suppressHoverUntilExit = false }
+            if model.hovering { model.hovering = false }
         }
+
+        let hoveredID = pointerInside ? sessionIndex(atViewPoint: viewPoint).map { model.sessions[$0].id } : nil
+        if model.hoveredSessionID != hoveredID { model.hoveredSessionID = hoveredID }
+    }
+
+    /// The session row at a point in hosting-view coordinates, or nil for the top bar, gutters,
+    /// padding, or a collapsed island. A single session's whole drop-down counts as its row.
+    private func sessionIndex(atViewPoint viewPoint: CGPoint) -> Int? {
+        guard model.isVisible, model.isTall, let hosting else { return nil }
+        let rect = hosting.interactiveRect
+        guard rect.contains(viewPoint) else { return nil }
+        if model.style == .slotMachine,
+           viewPoint.x >= rect.maxX - Theme.leverWidth || viewPoint.x <= rect.minX + Theme.leverWidth {
+            return nil
+        }
+        let yFromTop = hosting.isFlipped ? viewPoint.y : hosting.bounds.height - viewPoint.y
+        guard yFromTop > model.topInset else { return nil }
+        guard model.isMulti else { return model.sessions.isEmpty ? nil : 0 }
+
+        let rowY = yFromTop - model.topInset + sessionScrollOffset() - 7 // stack's top padding
+        guard rowY >= 0 else { return nil }
+        let stride = Theme.sessionRowHeight + Theme.sessionRowSpacing
+        let index = Int(rowY / stride)
+        let withinRow = rowY - CGFloat(index) * stride
+        guard withinRow <= Theme.sessionRowHeight, model.sessions.indices.contains(index) else {
+            return nil
+        }
+        return index
     }
 
     /// Call when visibility or expansion changes so the window-level mouse routing follows the
@@ -377,15 +432,7 @@ final class NotchWindowController: NSObject {
             return true
         }
 
-        let contentY = yFromTop - model.topInset + sessionScrollOffset()
-        let rowY = contentY - 7 // session stack's top padding
-        guard rowY >= 0 else { return false }
-        let stride = Theme.sessionRowHeight + Theme.sessionRowSpacing
-        let index = Int(rowY / stride)
-        let withinRow = rowY - CGFloat(index) * stride
-        guard withinRow <= Theme.sessionRowHeight,
-              model.sessions.indices.contains(index) else { return false }
-
+        guard let index = sessionIndex(atViewPoint: viewPoint) else { return false }
         let session = model.sessions[index]
         NSLog("Pookify Copilot: routed click to session row \(index), \(session.id).")
         model.onSelectSession(session.id)

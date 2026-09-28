@@ -70,6 +70,9 @@ final class IslandModel: ObservableObject {
     /// After opening a lone session, keep the island collapsed until the pointer leaves so the
     /// action has visible feedback even when that terminal was already frontmost.
     @Published var suppressHoverUntilExit = false
+    /// The session row under the pointer, computed by the AppKit router (SwiftUI hover tracking
+    /// is unreliable because the panel only accepts mouse events while the pointer is inside).
+    @Published var hoveredSessionID: String? = nil
     /// True while the island is being hidden: forces the slim presentation regardless of
     /// hover/pin, so the retract animation can NEVER play while the pill is tall.
     @Published var collapsing = false

@@ -11,6 +11,8 @@ All notable changes to Pookify Copilot are documented here. The format follows
 - Replaced SwiftUI `@State` with a `@StateObject` box so the app builds with Command Line Tools 27,
   which expand `@State` as a macro without shipping the SwiftUI macro plugin.
 - Demo sessions no longer pick up real Copilot processes.
+- Hover is now tracked by the AppKit pointer router instead of SwiftUI `onHover`, restoring the
+  hover-to-expand animation and adding row hover highlights (slot rows lift and glow).
 
 - Clicking a session row activates the terminal or IDE application that owns the corresponding
   Copilot process without pinning the closed bar to that session.

@@ -71,14 +71,9 @@ extension AnyTransition {
 ///   the notch. Pure flat black, no shadow — one object with the hardware.
 struct IslandPill: View {
     @ObservedObject var model: IslandModel
-    @StateObject private var hoverWorkState = ViewState<DispatchWorkItem?>(nil)
     /// Which edges of the session stack currently hide rows — drives the edge fog.
     @StateObject private var stackEdgesState = ViewState(StackEdges(top: false, bottom: false))
 
-    private var hoverWork: DispatchWorkItem? {
-        get { hoverWorkState.value }
-        nonmutating set { hoverWorkState.value = newValue }
-    }
     private var stackEdges: StackEdges {
         get { stackEdgesState.value }
         nonmutating set { stackEdgesState.value = newValue }
@@ -158,19 +153,7 @@ struct IslandPill: View {
         .onChange(of: expanded) { _, isExpanded in
             if isExpanded && model.style == .slotMachine { model.spinCount += 1 }
         }
-        .onHover { isOver in
-            hoverWork?.cancel()
-            if isOver {
-                guard !model.suppressHoverUntilExit else { return }
-                // small intent delay so a passing pointer doesn't pop it open
-                let work = DispatchWorkItem { model.hovering = true }
-                hoverWork = work
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.12, execute: work)
-            } else {
-                model.suppressHoverUntilExit = false
-                model.hovering = false
-            }
-        }
+        // Hover is computed by NotchWindowController from the pointer position; see updateHover.
         .animation(Theme.expand, value: expanded)
         .animation(Theme.expand, value: model.state)
         .animation(Theme.expand, value: model.showsTimer)
@@ -305,7 +288,9 @@ struct IslandPill: View {
     /// clicking opens its terminal.
     private func slotSingleDrop(_ session: SessionInfo) -> some View {
         VStack(spacing: 5) {
-            SlotSessionRow(session: session, isWinningLine: true, spinToken: model.spinCount)
+            SlotSessionRow(session: session, isWinningLine: true,
+                           isHovered: model.hoveredSessionID == session.id,
+                           spinToken: model.spinCount)
             Label("Open terminal", systemImage: "arrow.up.forward.app")
                 .font(.system(size: 9.5, weight: .bold, design: .rounded))
                 .foregroundStyle(Theme.goldGradient)
@@ -367,12 +352,14 @@ struct IslandPill: View {
                         SlotSessionRow(
                             session: session,
                             isWinningLine: session.id == model.displayedId,
+                            isHovered: model.hoveredSessionID == session.id,
                             spinToken: model.spinCount
                         )
                     } else {
                         SessionRow(
                             session: session,
-                            isDisplayed: session.id == model.displayedId
+                            isDisplayed: session.id == model.displayedId,
+                            hovering: model.hoveredSessionID == session.id
                         )
                     }
                 }
@@ -472,12 +459,7 @@ private struct StackEdges: Equatable {
 private struct SessionRow: View {
     let session: SessionInfo
     let isDisplayed: Bool
-    @StateObject private var hoveringState = ViewState(false)
-
-    private var hovering: Bool {
-        get { hoveringState.value }
-        nonmutating set { hoveringState.value = newValue }
-    }
+    let hovering: Bool
 
     var body: some View {
         HStack(spacing: 7) {
@@ -520,7 +502,6 @@ private struct SessionRow: View {
         .contentShape(Rectangle())
         .help("Open \(projectDisplay) terminal")
         .accessibilityLabel("Open \(projectDisplay) terminal, \(activityWord)")
-        .onHover { hovering = $0 }
         .animation(.easeOut(duration: 0.15), value: hovering)
         .animation(.easeOut(duration: 0.15), value: isDisplayed)
     }
