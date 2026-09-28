@@ -78,6 +78,10 @@ blinking winning line, finished sessions hit **JACKPOT** 🍒, idle ones show �
 requests pulse 🔔 in amber. Expanding the island or clicking the lever spins the reels.
 **Style → Classic** restores the original look; the choice is remembered.
 
+<p align="center">
+  <img src="docs/slot-machine.png" alt="Pookify Copilot in Slot Machine style: gold-framed reels per session, a JACKPOT result, marquee bulbs, and a pull lever" width="440">
+</p>
+
 ## Update
 
 Pull the latest source and run the installer again:
