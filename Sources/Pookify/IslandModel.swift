@@ -2,12 +2,40 @@ import SwiftUI
 import CoreGraphics
 import IslandCore
 
+/// Visual theme of the island. Behavior and hit geometry are identical in every style.
+enum IslandStyle: String, CaseIterable {
+    case classic
+    case slotMachine
+
+    var title: String {
+        switch self {
+        case .classic:     return "Classic"
+        case .slotMachine: return "Slot Machine"
+        }
+    }
+
+    private static let defaultsKey = "islandStyle"
+
+    /// The persisted choice; ISLAND_STYLE overrides it for demos and screenshots.
+    static var saved: IslandStyle {
+        get {
+            let env = ProcessInfo.processInfo.environment["ISLAND_STYLE"] ?? ""
+            let raw = env.isEmpty ? UserDefaults.standard.string(forKey: defaultsKey) : env
+            return raw.flatMap(IslandStyle.init(rawValue:)) ?? .classic
+        }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: defaultsKey) }
+    }
+}
+
 /// What the island is currently showing. The app controller pushes updates into this on each
 /// poll; the SwiftUI view observes it. Hover is owned by the view; `forceExpand` lets the
 /// controller auto-open the island on an important change (e.g. a permission request).
 @MainActor
 final class IslandModel: ObservableObject {
     @Published var isVisible = false
+    @Published var style: IslandStyle = .saved
+    /// Incremented whenever the slot machine should spin: on expansion and on each lever pull.
+    @Published var spinCount = 0
     @Published var provider: Provider = .copilot
     @Published var state: AgentState = .idle
     @Published var label: String = ""

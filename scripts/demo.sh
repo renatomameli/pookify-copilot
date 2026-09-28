@@ -12,13 +12,13 @@
 #   ./scripts/demo.sh stop
 #
 # Activities:
-#   thinking reading searching running editing writing websearch webfetch
 #   idle thinking reading searching running editing writing websearch webfetch
 #   planning delegating mcp asking compacting working permission input done error
 #
 # Options:
 #   EXPAND=1              keep the drop-down open
 #   SHADE=<0..1 | #hex>   override the pill color
+#   STYLE=<classic | slotMachine>   choose the visual style
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -74,6 +74,8 @@ ensure_app() {
   ISLAND_SUPPORT_DIR="$DEMO_ROOT" \
   ISLAND_NO_INSTALL=1 \
   ISLAND_PILL="${SHADE:-}" \
+  ISLAND_STYLE="${STYLE:-}" \
+  ISLAND_PROCESS_DISCOVERY_ROOT="$DEMO_ROOT/no-processes" \
   ISLAND_FORCE_EXPAND="${EXPAND:-}" \
   nohup "$APP" >/dev/null 2>&1 &
   printf '%s\n' "$!" > "$RUN/launched-app.pid"
@@ -175,16 +177,17 @@ show_multi() {
 
   for ((i = 0; i < count; i++)); do
     pid="$(live_pid "multi$i")"
-    case $((i % 5)) in
+    case $((i % 6)) in
       0) project="api-server"; state=tool; label=Editing; tool=edit; ago=45; detail="Routes.swift" ;;
       1) project="dashboard"; state=permission; label="Awaiting permission"; tool=bash; ago=130; detail="" ;;
       2) project="docs-site"; state=tool; label=Reading; tool=view; ago=18; detail="README.md" ;;
       3) project="release"; state=tool; label="Running command"; tool=bash; ago=320; detail="" ;;
       4) project="mobile-app"; state=idle; label=""; tool=""; ago=0; detail="" ;;
+      5) project="billing"; state="done"; label="Done"; tool=""; ago=0; detail="" ;;
     esac
     printf '{"schema":2,"provider":"copilot","sessionId":"multi%s","state":"%s","label":"%s","tool":"%s","project":"%s","cwd":"%s","pid":%s,"startedAt":%s,"ts":%s,"toolEndsAt":0,"detail":"%s"}\n' \
       "$i" "$state" "$label" "$tool" "$project-$i" "$(json_escape "$REPO")" \
-      "$pid" "$((now - ago))" "$now" "$detail" > "$SD/copilot-multi$i.json"
+      "$pid" "$(( ago > 0 ? now - ago : 0 ))" "$now" "$detail" > "$SD/copilot-multi$i.json"
   done
   ensure_app
   echo "Pookify Copilot: $count fake sessions (permission first, then newest turns)."

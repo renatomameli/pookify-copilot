@@ -44,13 +44,14 @@ struct AgentGlyph: View {
     let provider: Provider
     var working: Bool = true
     var size: CGFloat = 18
+    var tint: Color? = nil
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 18.0, paused: !working)) { context in
             let phase = working
                 ? sin(context.date.timeIntervalSinceReferenceDate * .pi * 2.0)
                 : 0
-            CopilotMark(color: Theme.accent(provider), phase: phase, size: size)
+            CopilotMark(color: tint ?? Theme.accent(provider), phase: phase, size: size)
         }
         .frame(width: size, height: size)
     }

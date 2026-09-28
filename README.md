@@ -69,6 +69,15 @@ collapses as confirmation, including when that terminal was already frontmost.
   <img src="docs/session-stack.png" alt="Expanded Pookify Copilot stack with ten synthetic sessions ordered by urgency" width="520">
 </p>
 
+## Slot Machine style
+
+Right-click the island and choose **Style → Slot Machine** for a casino cabinet: red body,
+gold bezels, flaming reel text, chasing marquee bulbs, and a pull lever with a green knob. Each
+session is a row of three reels (project · activity · timer). The most urgent session sits on the
+blinking winning line, finished sessions hit **JACKPOT** 🍒, idle ones show 🍋, and permission
+requests pulse 🔔 in amber. Expanding the island or clicking the lever spins the reels.
+**Style → Classic** restores the original look; the choice is remembered.
+
 ## Update
 
 Pull the latest source and run the installer again:

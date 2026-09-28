@@ -71,9 +71,18 @@ extension AnyTransition {
 ///   the notch. Pure flat black, no shadow — one object with the hardware.
 struct IslandPill: View {
     @ObservedObject var model: IslandModel
-    @State private var hoverWork: DispatchWorkItem?
+    @StateObject private var hoverWorkState = ViewState<DispatchWorkItem?>(nil)
     /// Which edges of the session stack currently hide rows — drives the edge fog.
-    @State private var stackEdges = StackEdges(top: false, bottom: false)
+    @StateObject private var stackEdgesState = ViewState(StackEdges(top: false, bottom: false))
+
+    private var hoverWork: DispatchWorkItem? {
+        get { hoverWorkState.value }
+        nonmutating set { hoverWorkState.value = newValue }
+    }
+    private var stackEdges: StackEdges {
+        get { stackEdgesState.value }
+        nonmutating set { stackEdgesState.value = newValue }
+    }
 
     // Symmetric wing metrics — both sides identical so the camera gap is centered.
     private let wing: CGFloat = Theme.wing  // room for a 2-digit:2-digit clock (e.g. 15:48) with even margins
@@ -104,7 +113,8 @@ struct IslandPill: View {
     // a non-notched display, where the gap is tiny, does it widen enough to fit the dropped-in label.
     // (The session stack lays out within the closed width, so it never asks for more.)
     private var pillWidth: CGFloat {
-        expanded && !model.isMulti ? max(closedWidth, labelW + 40) : closedWidth
+        guard expanded, !model.isMulti else { return closedWidth }
+        return model.style == .slotMachine ? closedWidth : max(closedWidth, labelW + 40)
     }
     private var pillHeight: CGFloat { expanded ? closedH + model.dropHeight : closedH }
 
@@ -112,20 +122,42 @@ struct IslandPill: View {
         let topR: CGFloat = 7
         let bottomR: CGFloat = expanded ? 20 : max(10, closedH * 0.40)
         let shape = NotchShape(topRadius: topR, bottomRadius: bottomR)
+        let showsLever = model.style == .slotMachine && expanded
 
-        ZStack(alignment: .top) {
-            shape.fill(Theme.pill)
-            VStack(spacing: 0) {
-                notchRow
-                    .frame(width: closedWidth, height: closedH)
-                dropDown
-                    .frame(height: model.dropHeight)
-                    .opacity(expanded ? 1 : 0)
+        HStack(alignment: .top, spacing: 0) {
+            // Mirror of the lever's width, so the cabinet stays centered on the notch.
+            Color.clear.frame(width: showsLever ? Theme.leverWidth : 0, height: 1)
+            ZStack(alignment: .top) {
+                cabinet(shape)
+                VStack(spacing: 0) {
+                    notchRow
+                        .frame(width: closedWidth, height: closedH)
+                    dropDown
+                        .frame(height: model.dropHeight)
+                        .opacity(expanded ? 1 : 0)
+                }
+                if showsLever && model.isMulti {
+                    MarqueeBulbs(count: 16)
+                        .padding(.horizontal, 22)
+                        .frame(height: 5)
+                        .frame(maxHeight: .infinity, alignment: .bottom)
+                        .padding(.bottom, 2)
+                        .transition(.opacity)
+                }
+            }
+            .frame(width: pillWidth, height: pillHeight, alignment: .top)
+            .clipShape(shape)
+            if showsLever {
+                SlotLever(spinToken: model.spinCount)
+                    .frame(width: Theme.leverWidth)
+                    .padding(.top, closedH + 2)
+                    .transition(.move(edge: .leading).combined(with: .opacity))
             }
         }
-        .frame(width: pillWidth, height: pillHeight, alignment: .top)
-        .clipShape(shape)
-        .contentShape(shape)
+        .contentShape(Rectangle())
+        .onChange(of: expanded) { _, isExpanded in
+            if isExpanded && model.style == .slotMachine { model.spinCount += 1 }
+        }
         .onHover { isOver in
             hoverWork?.cancel()
             if isOver {
@@ -143,15 +175,38 @@ struct IslandPill: View {
         .animation(Theme.expand, value: model.state)
         .animation(Theme.expand, value: model.showsTimer)
         .animation(Theme.expand, value: model.sessions.count)
+        .animation(Theme.expand, value: model.style)
     }
 
     // MARK: closed row (balanced, centered on the camera)
+
+    /// Classic: flat black fused with the notch. Slot machine: black at the top (still fused with
+    /// the hardware) burning into a deep red casino cabinet trimmed in polished gold.
+    @ViewBuilder private func cabinet(_ shape: NotchShape) -> some View {
+        if model.style == .slotMachine {
+            shape
+                .fill(LinearGradient(
+                    stops: [
+                        .init(color: Theme.pill, location: 0),
+                        .init(color: Theme.cabinetDeep, location: expanded ? 0.18 : 0.55),
+                        .init(color: Theme.cabinet, location: 1),
+                    ],
+                    startPoint: .top, endPoint: .bottom))
+                .overlay(
+                    shape.stroke(Theme.goldGradient, lineWidth: expanded ? 3 : 2)
+                        .shadow(color: Theme.flame.opacity(0.8), radius: 3)
+                )
+        } else {
+            shape.fill(Theme.pill)
+        }
+    }
 
     private var notchRow: some View {
         HStack(spacing: 0) {
             // Left wing — the agent's mark, ALWAYS here, centered (never moves between states).
             // Animates while working and rests next to the status when attention is needed.
-            AgentGlyph(provider: model.provider, working: model.state.isWorking, size: iconSize)
+            AgentGlyph(provider: model.provider, working: model.state.isWorking, size: iconSize,
+                       tint: model.style == .slotMachine ? Theme.gold : nil)
                 .frame(width: iconSize, height: iconSize)
                 .frame(width: wing, height: closedH)
                 .offset(x: wingInset)                  // nudge toward the notch to optically center
@@ -167,7 +222,17 @@ struct IslandPill: View {
     }
 
     @ViewBuilder private var rightStatus: some View {
-        if model.readyCount > 0 && model.state != .permission && model.state != .error {
+        if model.style == .slotMachine,
+           model.readyCount > 0, model.state != .permission, model.state != .error {
+            SlotCounter(text: "\(model.readyCount)/\(model.sessions.count)", showsCheck: true)
+                .accessibilityLabel(
+                    "\(model.readyCount) sessions ready of \(model.sessions.count) open"
+                )
+                .help("\(model.readyCount) ready / \(model.sessions.count) open")
+        } else if model.style == .slotMachine,
+                  model.isMulti, model.state != .permission, model.state != .error {
+            SlotCounter(text: "\(model.sessions.count)")
+        } else if model.readyCount > 0 && model.state != .permission && model.state != .error {
             HStack(spacing: 2) {
                 Image(systemName: "checkmark")
                     .font(.system(size: 7.5, weight: .black))
@@ -229,9 +294,25 @@ struct IslandPill: View {
     @ViewBuilder private var dropDown: some View {
         if model.isMulti {
             sessionStack
+        } else if model.style == .slotMachine, let session = model.sessions.first {
+            slotSingleDrop(session)
         } else {
             singleDrop
         }
+    }
+
+    /// One session in slot style: a single set of reels on the winning line, plus the hint that
+    /// clicking opens its terminal.
+    private func slotSingleDrop(_ session: SessionInfo) -> some View {
+        VStack(spacing: 5) {
+            SlotSessionRow(session: session, isWinningLine: true, spinToken: model.spinCount)
+            Label("Open terminal", systemImage: "arrow.up.forward.app")
+                .font(.system(size: 9.5, weight: .bold, design: .rounded))
+                .foregroundStyle(Theme.goldGradient)
+        }
+        .padding(.horizontal, 6)
+        .padding(.top, 7)
+        .frame(width: closedWidth)
     }
 
     private var singleDrop: some View {
@@ -282,10 +363,18 @@ struct IslandPill: View {
         let scroll = ScrollView(.vertical) {
             VStack(spacing: Theme.sessionRowSpacing) {
                 ForEach(model.sessions) { session in
-                    SessionRow(
-                        session: session,
-                        isDisplayed: session.id == model.displayedId
-                    )
+                    if model.style == .slotMachine {
+                        SlotSessionRow(
+                            session: session,
+                            isWinningLine: session.id == model.displayedId,
+                            spinToken: model.spinCount
+                        )
+                    } else {
+                        SessionRow(
+                            session: session,
+                            isDisplayed: session.id == model.displayedId
+                        )
+                    }
                 }
             }
             .padding(.horizontal, 6)   // slim insets: rows need every point of width
@@ -383,7 +472,12 @@ private struct StackEdges: Equatable {
 private struct SessionRow: View {
     let session: SessionInfo
     let isDisplayed: Bool
-    @State private var hovering = false
+    @StateObject private var hoveringState = ViewState(false)
+
+    private var hovering: Bool {
+        get { hoveringState.value }
+        nonmutating set { hoveringState.value = newValue }
+    }
 
     var body: some View {
         HStack(spacing: 7) {

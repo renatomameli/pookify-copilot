@@ -6,6 +6,12 @@ All notable changes to Pookify Copilot are documented here. The format follows
 
 ## [Unreleased]
 
+- Added an optional **Slot Machine** style (right-click → Style): casino cabinet with gold reels,
+  marquee bulbs, a winning line, JACKPOT results, and a pull lever that spins the reels.
+- Replaced SwiftUI `@State` with a `@StateObject` box so the app builds with Command Line Tools 27,
+  which expand `@State` as a macro without shipping the SwiftUI macro plugin.
+- Demo sessions no longer pick up real Copilot processes.
+
 - Clicking a session row activates the terminal or IDE application that owns the corresponding
   Copilot process without pinning the closed bar to that session.
 - The closed multi-session island shows a green ready-session count whenever one or more sessions

@@ -30,6 +30,34 @@ enum Theme {
     // A calm green for finished ("completed") sessions — distinct from the working accent (blue)
     // and the attention amber, so a resting done session reads as done at a glance.
     static let green = Color(.sRGB, red: 0.36, green: 0.80, blue: 0.50, opacity: 1)
+    // Slot-machine style: a casino cabinet. It stays pure black at the very top so it still fuses
+    // with the hardware notch, then burns into deep red trimmed with gold.
+    static let cabinet = Color(.sRGB, red: 0.42, green: 0.02, blue: 0.04, opacity: 1)
+    static let cabinetDeep = Color(.sRGB, red: 0.16, green: 0.0, blue: 0.02, opacity: 1)
+    static let gold = Color(.sRGB, red: 1.0, green: 0.80, blue: 0.22, opacity: 1)
+    static let flame = Color(.sRGB, red: 1.0, green: 0.42, blue: 0.04, opacity: 1)
+    static let knobGreen = Color(.sRGB, red: 0.30, green: 0.82, blue: 0.32, opacity: 1)
+    /// Width reserved on each side of the expanded slot cabinet for the pull lever.
+    static let leverWidth: CGFloat = 24
+
+    /// Polished gold: bright highlight, rich gold, dark bronze, gold again.
+    static var goldGradient: LinearGradient {
+        LinearGradient(
+            stops: [
+                .init(color: Color(.sRGB, red: 1.0, green: 0.97, blue: 0.72, opacity: 1), location: 0),
+                .init(color: gold, location: 0.35),
+                .init(color: Color(.sRGB, red: 0.70, green: 0.40, blue: 0.04, opacity: 1), location: 0.7),
+                .init(color: gold, location: 1),
+            ],
+            startPoint: .top, endPoint: .bottom)
+    }
+
+    /// Flaming gold text: yellow core burning into orange.
+    static var flameGradient: LinearGradient {
+        LinearGradient(
+            colors: [Color(.sRGB, red: 1.0, green: 0.96, blue: 0.55, opacity: 1), gold, flame],
+            startPoint: .top, endPoint: .bottom)
+    }
 
     // Pill geometry shared by the view and the window's interactive-zone math.
     static let wing: CGFloat = 56        // each side wing (glyph / timer) of the closed bar

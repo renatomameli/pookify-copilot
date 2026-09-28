@@ -147,7 +147,9 @@ final class NotchWindowController: NSObject {
         guard let panel, let hosting else { return }
         let h = hosting.bounds.height
         let w = hosting.bounds.width
-        let zoneWidth = Theme.wing + model.notchWidth + Theme.wing
+        let showsLever = model.style == .slotMachine && model.isTall
+        let leverSpace = showsLever ? Theme.leverWidth * 2 : 0
+        let zoneWidth = Theme.wing + model.notchWidth + Theme.wing + leverSpace
         let zoneHeight = model.topInset + (model.isTall ? model.dropHeight : 0)
         let rect = CGRect(
             x: (w - zoneWidth) / 2,
@@ -287,6 +289,25 @@ final class NotchWindowController: NSObject {
             menu.addItem(displayItem)
         }
 
+        let styleItem = NSMenuItem(title: "Style", action: nil, keyEquivalent: "")
+        let styleMenu = NSMenu(title: "Style")
+        styleMenu.autoenablesItems = false
+        for style in IslandStyle.allCases {
+            let item = NSMenuItem(
+                title: style.title,
+                action: #selector(selectStyle(_:)),
+                keyEquivalent: ""
+            )
+            item.target = self
+            item.representedObject = style.rawValue
+            item.state = model.style == style ? .on : .off
+            item.isEnabled = true
+            styleMenu.addItem(item)
+        }
+        styleItem.submenu = styleMenu
+        styleItem.isEnabled = true
+        menu.addItem(styleItem)
+
         menu.addItem(.separator())
         let quit = NSMenuItem(
             title: "Quit Pookify Copilot",
@@ -315,6 +336,13 @@ final class NotchWindowController: NSObject {
         model.onChooseDisplay(rawValue == 0 ? nil : CGDirectDisplayID(rawValue))
     }
 
+    @objc private func selectStyle(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String,
+              let style = IslandStyle(rawValue: raw) else { return }
+        IslandStyle.saved = style
+        model.style = style
+    }
+
     @objc private func quitFromMenu(_ sender: NSMenuItem) {
         model.onQuit()
     }
@@ -325,6 +353,17 @@ final class NotchWindowController: NSObject {
         guard model.isVisible, let hosting else { return false }
         let viewPoint = hosting.convert(point, from: nil)
         guard hosting.interactiveRect.contains(viewPoint) else { return false }
+
+        // Slot machine: the right gutter holds the lever, the left one only mirrors it.
+        if model.style == .slotMachine, model.isTall {
+            let rect = hosting.interactiveRect
+            if viewPoint.x >= rect.maxX - Theme.leverWidth {
+                NSLog("Pookify Copilot: lever pulled.")
+                model.spinCount += 1
+                return true
+            }
+            if viewPoint.x <= rect.minX + Theme.leverWidth { return true }
+        }
 
         let yFromTop = hosting.isFlipped ? viewPoint.y : hosting.bounds.height - viewPoint.y
         if yFromTop <= model.topInset {

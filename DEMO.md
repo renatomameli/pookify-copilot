@@ -45,10 +45,12 @@ For example:
 ./scripts/demo.sh permission
 EXPAND=1 ./scripts/demo.sh editing
 SHADE=0.06 ./scripts/demo.sh running
+EXPAND=1 STYLE=slotMachine ./scripts/demo.sh multi 6
 ```
 
 `EXPAND=1` keeps the activity label visible. `SHADE` accepts a grayscale value from `0` to `1`
-or a `#RRGGBB` color.
+or a `#RRGGBB` color. `STYLE` selects `classic` or `slotMachine`. Demo sessions never include
+real Copilot processes.
 
 ## Sequences
 
