@@ -138,6 +138,13 @@ struct IslandPill: View {
                         .padding(.bottom, 2)
                         .opacity(expanded ? 1 : 0)
                 }
+                if model.style == .blockCraft && model.isMulti {
+                    XPBar(ready: model.readyCount, total: model.sessions.count)
+                        .frame(width: 150, height: 5)
+                        .frame(maxHeight: .infinity, alignment: .bottom)
+                        .padding(.bottom, 2)
+                        .opacity(expanded ? 1 : 0)
+                }
                 if showsLever && model.isMulti {
                     MarqueeBulbs(count: 16)
                         .padding(.horizontal, 22)
@@ -174,7 +181,18 @@ struct IslandPill: View {
     /// the hardware) burning into a deep red casino cabinet trimmed in polished gold. Pit wall:
     /// black fading into carbon fibre with a red racing trim.
     @ViewBuilder private func cabinet(_ shape: NotchShape) -> some View {
-        if model.style == .pitWall {
+        if model.style == .blockCraft {
+            // Block Craft: black fused with the notch, fading into a stone texture with a grass rim.
+            StoneTexture()
+                .overlay(LinearGradient(
+                    stops: [
+                        .init(color: Theme.pill, location: 0),
+                        .init(color: Theme.pill.opacity(0), location: expanded ? 0.22 : 0.9),
+                    ],
+                    startPoint: .top, endPoint: .bottom))
+                .clipShape(shape)
+                .overlay(shape.stroke(Theme.mcGrass, lineWidth: expanded ? 2.5 : 1.6))
+        } else if model.style == .pitWall {
             shape
                 .fill(LinearGradient(
                     stops: [
@@ -231,11 +249,22 @@ struct IslandPill: View {
         case .classic:     return nil
         case .slotMachine: return Theme.gold
         case .pitWall:     return Theme.f1Red
+        case .blockCraft:  return Theme.xpGreen
         }
     }
 
     @ViewBuilder private var rightStatus: some View {
-        if model.style == .pitWall,
+        if model.style == .blockCraft,
+           model.readyCount > 0, model.state != .permission, model.state != .error {
+            BlockBadge(text: "\(model.readyCount)/\(model.sessions.count)", showsCheck: true)
+                .accessibilityLabel(
+                    "\(model.readyCount) sessions ready of \(model.sessions.count) open"
+                )
+                .help("\(model.readyCount) ready / \(model.sessions.count) open")
+        } else if model.style == .blockCraft,
+                  model.isMulti, model.state != .permission, model.state != .error {
+            BlockBadge(text: "\(model.sessions.count)")
+        } else if model.style == .pitWall,
            model.readyCount > 0, model.state != .permission, model.state != .error {
             PitBadge(text: "\(model.readyCount)/\(model.sessions.count)", stripe: Theme.f1Green,
                      showsFlag: true)
@@ -322,6 +351,8 @@ struct IslandPill: View {
             slotSingleDrop(session)
         } else if model.style == .pitWall, let session = model.sessions.first {
             pitWallSingleDrop(session)
+        } else if model.style == .blockCraft, let session = model.sessions.first {
+            blockCraftSingleDrop(session)
         } else {
             singleDrop
         }
@@ -352,6 +383,20 @@ struct IslandPill: View {
             Label("Radio: open terminal", systemImage: "antenna.radiowaves.left.and.right")
                 .font(Theme.raceFont(9.5))
                 .foregroundStyle(Theme.f1Mint)
+        }
+        .padding(.horizontal, 6)
+        .padding(.top, 7)
+        .frame(width: closedWidth)
+    }
+
+    /// One session in Block Craft style: its inventory slot plus the hint to open it.
+    private func blockCraftSingleDrop(_ session: SessionInfo) -> some View {
+        VStack(spacing: 5) {
+            BlockCraftRow(session: session, isSelected: true,
+                          isHovered: model.hoveredSessionID == session.id,
+                          index: 0, spinToken: model.spinCount)
+            Text("Click to open terminal")
+                .blockText(size: 9.5, color: Theme.mcGray)
         }
         .padding(.horizontal, 6)
         .padding(.top, 7)
@@ -406,7 +451,15 @@ struct IslandPill: View {
         let scroll = ScrollView(.vertical) {
             VStack(spacing: Theme.sessionRowSpacing) {
                 ForEach(Array(model.sessions.enumerated()), id: \.element.id) { index, session in
-                    if model.style == .pitWall {
+                    if model.style == .blockCraft {
+                        BlockCraftRow(
+                            session: session,
+                            isSelected: session.id == model.displayedId,
+                            isHovered: model.hoveredSessionID == session.id,
+                            index: index,
+                            spinToken: model.spinCount
+                        )
+                    } else if model.style == .pitWall {
                         PitWallRow(
                             session: session,
                             position: index + 1,

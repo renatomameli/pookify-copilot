@@ -6,6 +6,8 @@ All notable changes to Pookify Copilot are documented here. The format follows
 
 ## [Unreleased]
 
+- Added an optional **Block Craft** style: code-drawn pixel blocks in inventory slots, mining
+  cracks while working, flashing TNT for permission, gems when finished, XP timers, and an XP bar.
 - Added an optional **F1 Pit Wall** style: a carbon-fibre timing tower with positions, team
   stripes, sector lights, BOX BOX permission calls, chequered flags, and start lights.
 - Added an optional **Slot Machine** style (right-click → Style): casino cabinet with gold reels,

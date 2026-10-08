@@ -94,6 +94,21 @@ the island plays the five-light start sequence while the rows slide in.
   <img src="docs/pit-wall.png" alt="Pookify Copilot in F1 Pit Wall style: a timing tower with positions, team stripes, sector lights, BOX BOX, and a chequered flag" width="400">
 </p>
 
+## Block Craft style
+
+**Style → Block Craft** is a blocky voxel look inspired by Minecraft, with code-drawn pixel art on a
+stone texture with a grass rim. Each session sits in a bevelled inventory slot, and the session
+the closed bar is showing gets a white hotbar frame. Working sessions mine a stone block whose
+cracks grow, permission requests flash a TNT block (**TNT! Allow?**), finished sessions show a
+gem, errors are lava (**You died**), and idle sessions sleep on a grass block. Activities become
+Crafting, Mining, Smelting, and Brewing. The elapsed time is a green XP number, and an XP bar fills
+as sessions finish. Rows pop in like picked-up items when the island opens. All artwork is
+original; this project is not affiliated with Mojang or Microsoft.
+
+<p align="center">
+  <img src="docs/block-craft.png" alt="Pookify Copilot in Block Craft style: inventory slots with pixel blocks, TNT permission, mining activities, XP timers, and an XP bar" width="400">
+</p>
+
 ## Update
 
 Pull the latest source and run the installer again:

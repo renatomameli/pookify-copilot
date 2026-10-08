@@ -7,12 +7,14 @@ enum IslandStyle: String, CaseIterable {
     case classic
     case slotMachine
     case pitWall
+    case blockCraft
 
     var title: String {
         switch self {
         case .classic:     return "Classic"
         case .slotMachine: return "Slot Machine"
         case .pitWall:     return "F1 Pit Wall"
+        case .blockCraft:  return "Block Craft"
         }
     }
 

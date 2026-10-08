@@ -72,6 +72,22 @@ enum Theme {
         .system(size: size, weight: .heavy).width(.condensed).italic()
     }
 
+    // Block Craft style: stone, grass, and classic 16-color UI text.
+    static let mcGrass = Color(.sRGB, red: 0.36, green: 0.70, blue: 0.23, opacity: 1)
+    static let xpGreen = Color(.sRGB, red: 0.50, green: 1.0, blue: 0.13, opacity: 1)
+    static let mcYellow = Color(.sRGB, red: 1.0, green: 1.0, blue: 0.33, opacity: 1)
+    static let mcAqua = Color(.sRGB, red: 0.33, green: 1.0, blue: 1.0, opacity: 1)
+    static let mcGreen = Color(.sRGB, red: 0.33, green: 1.0, blue: 0.33, opacity: 1)
+    static let mcRed = Color(.sRGB, red: 1.0, green: 0.33, blue: 0.33, opacity: 1)
+    static let mcGray = Color(.sRGB, white: 0.67, opacity: 1)
+
+    /// Deterministic per-pixel noise for the code-drawn block textures.
+    static func pixelNoise(_ x: Int, _ y: Int, _ seed: Int) -> Int {
+        var h = UInt32(truncatingIfNeeded: x &* 374_761_393 &+ y &* 668_265_263 &+ seed &* 982_451_653)
+        h = (h ^ (h >> 13)) &* 1_274_126_177
+        return Int(h ^ (h >> 16))
+    }
+
     /// Polished gold: bright highlight, rich gold, dark bronze, gold again.
     static var goldGradient: LinearGradient {
         LinearGradient(
