@@ -6,11 +6,13 @@ import IslandCore
 enum IslandStyle: String, CaseIterable {
     case classic
     case slotMachine
+    case pitWall
 
     var title: String {
         switch self {
         case .classic:     return "Classic"
         case .slotMachine: return "Slot Machine"
+        case .pitWall:     return "F1 Pit Wall"
         }
     }
 
@@ -34,7 +36,8 @@ enum IslandStyle: String, CaseIterable {
 final class IslandModel: ObservableObject {
     @Published var isVisible = false
     @Published var style: IslandStyle = .saved
-    /// Incremented whenever the slot machine should spin: on expansion and on each lever pull.
+    /// Incremented whenever a themed style should replay its entrance: on expansion and on each
+    /// slot-machine lever pull.
     @Published var spinCount = 0
     @Published var provider: Provider = .copilot
     @Published var state: AgentState = .idle

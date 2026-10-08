@@ -6,6 +6,8 @@ All notable changes to Pookify Copilot are documented here. The format follows
 
 ## [Unreleased]
 
+- Added an optional **F1 Pit Wall** style: a carbon-fibre timing tower with positions, team
+  stripes, sector lights, BOX BOX permission calls, chequered flags, and start lights.
 - Added an optional **Slot Machine** style (right-click → Style): casino cabinet with gold reels,
   marquee bulbs, a winning line, JACKPOT results, and a pull lever that spins the reels.
 - Replaced SwiftUI `@State` with a `@StateObject` box so the app builds with Command Line Tools 27,

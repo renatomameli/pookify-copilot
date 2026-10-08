@@ -18,7 +18,7 @@
 # Options:
 #   EXPAND=1              keep the drop-down open
 #   SHADE=<0..1 | #hex>   override the pill color
-#   STYLE=<classic | slotMachine>   choose the visual style
+#   STYLE=<classic | slotMachine | pitWall>   choose the visual style
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

@@ -40,6 +40,38 @@ enum Theme {
     /// Width reserved on each side of the expanded slot cabinet for the pull lever.
     static let leverWidth: CGFloat = 24
 
+    // Pit-wall style: carbon fibre, timing-screen colors, and team liveries.
+    static let carbon = Color(.sRGB, white: 0.075, opacity: 1)
+    static let f1Red = Color(.sRGB, red: 0.91, green: 0.0, blue: 0.18, opacity: 1)
+    static let f1Yellow = Color(.sRGB, red: 1.0, green: 0.84, blue: 0.0, opacity: 1)
+    static let f1Green = Color(.sRGB, red: 0.16, green: 0.86, blue: 0.36, opacity: 1)
+    static let f1Purple = Color(.sRGB, red: 0.70, green: 0.28, blue: 1.0, opacity: 1)
+    static let f1Mint = Color(.sRGB, red: 0.15, green: 0.96, blue: 0.82, opacity: 1)
+    static let sectorOff = Color(.sRGB, white: 0.22, opacity: 1)
+    private static let teamColors: [Color] = [
+        Color(.sRGB, red: 0.91, green: 0.0, blue: 0.18, opacity: 1),   // red
+        Color(.sRGB, red: 0.15, green: 0.96, blue: 0.82, opacity: 1),  // teal
+        Color(.sRGB, red: 0.21, green: 0.44, blue: 0.78, opacity: 1),  // blue
+        Color(.sRGB, red: 1.0, green: 0.50, blue: 0.0, opacity: 1),    // papaya
+        Color(.sRGB, red: 0.13, green: 0.60, blue: 0.44, opacity: 1),  // racing green
+        Color(.sRGB, red: 1.0, green: 0.53, blue: 0.74, opacity: 1),   // pink
+        Color(.sRGB, red: 0.39, green: 0.77, blue: 1.0, opacity: 1),   // sky blue
+        Color(.sRGB, red: 0.71, green: 0.73, blue: 0.74, opacity: 1),  // silver
+        Color(.sRGB, red: 0.32, green: 0.89, blue: 0.32, opacity: 1),  // lime
+        Color(.sRGB, red: 0.40, green: 0.57, blue: 1.0, opacity: 1),   // light blue
+    ]
+
+    /// A stable livery per project (Swift's `hashValue` is randomized per launch).
+    static func teamColor(for project: String) -> Color {
+        let hash = project.unicodeScalars.reduce(UInt32(5381)) { ($0 &* 33) &+ $1.value }
+        return teamColors[Int(hash % UInt32(teamColors.count))]
+    }
+
+    /// Timing-tower lettering: heavy, condensed, italic.
+    static func raceFont(_ size: CGFloat) -> Font {
+        .system(size: size, weight: .heavy).width(.condensed).italic()
+    }
+
     /// Polished gold: bright highlight, rich gold, dark bronze, gold again.
     static var goldGradient: LinearGradient {
         LinearGradient(

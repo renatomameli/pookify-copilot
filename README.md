@@ -82,6 +82,18 @@ requests pulse 🔔 in amber. Expanding the island or clicking the lever spins t
   <img src="docs/slot-machine.png" alt="Pookify Copilot in Slot Machine style: gold-framed reels per session, a JACKPOT result, marquee bulbs, and a pull lever" width="440">
 </p>
 
+## F1 Pit Wall style
+
+**Style → F1 Pit Wall** turns the island into a timing tower on carbon fibre with a red racing
+trim. Every session gets a position, a team-color stripe, three mini-sector lights, a race status,
+and its lap clock. Permission requests flash **BOX BOX**, finished sessions take the chequered
+flag 🏁 with an all-purple lap, errors are a **DNF**, and idle sessions sit **IN PIT**. Expanding
+the island plays the five-light start sequence while the rows slide in.
+
+<p align="center">
+  <img src="docs/pit-wall.png" alt="Pookify Copilot in F1 Pit Wall style: a timing tower with positions, team stripes, sector lights, BOX BOX, and a chequered flag" width="400">
+</p>
+
 ## Update
 
 Pull the latest source and run the installer again:

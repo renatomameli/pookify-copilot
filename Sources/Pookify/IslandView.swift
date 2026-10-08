@@ -109,7 +109,7 @@ struct IslandPill: View {
     // (The session stack lays out within the closed width, so it never asks for more.)
     private var pillWidth: CGFloat {
         guard expanded, !model.isMulti else { return closedWidth }
-        return model.style == .slotMachine ? closedWidth : max(closedWidth, labelW + 40)
+        return model.style == .classic ? max(closedWidth, labelW + 40) : closedWidth
     }
     private var pillHeight: CGFloat { expanded ? closedH + model.dropHeight : closedH }
 
@@ -129,6 +129,13 @@ struct IslandPill: View {
                         .frame(width: closedWidth, height: closedH)
                     dropDown
                         .frame(height: model.dropHeight)
+                        .opacity(expanded ? 1 : 0)
+                }
+                if model.style == .pitWall && model.isMulti {
+                    StartLights(spinToken: model.spinCount)
+                        .frame(height: 5)
+                        .frame(maxHeight: .infinity, alignment: .bottom)
+                        .padding(.bottom, 2)
                         .opacity(expanded ? 1 : 0)
                 }
                 if showsLever && model.isMulti {
@@ -151,7 +158,7 @@ struct IslandPill: View {
         }
         .contentShape(Rectangle())
         .onChange(of: expanded) { _, isExpanded in
-            if isExpanded && model.style == .slotMachine { model.spinCount += 1 }
+            if isExpanded && model.style != .classic { model.spinCount += 1 }
         }
         // Hover is computed by NotchWindowController from the pointer position; see updateHover.
         .animation(Theme.expand, value: expanded)
@@ -164,9 +171,24 @@ struct IslandPill: View {
     // MARK: closed row (balanced, centered on the camera)
 
     /// Classic: flat black fused with the notch. Slot machine: black at the top (still fused with
-    /// the hardware) burning into a deep red casino cabinet trimmed in polished gold.
+    /// the hardware) burning into a deep red casino cabinet trimmed in polished gold. Pit wall:
+    /// black fading into carbon fibre with a red racing trim.
     @ViewBuilder private func cabinet(_ shape: NotchShape) -> some View {
-        if model.style == .slotMachine {
+        if model.style == .pitWall {
+            shape
+                .fill(LinearGradient(
+                    stops: [
+                        .init(color: Theme.pill, location: 0),
+                        .init(color: Theme.carbon, location: expanded ? 0.2 : 0.7),
+                        .init(color: Color(.sRGB, white: 0.11, opacity: 1), location: 1),
+                    ],
+                    startPoint: .top, endPoint: .bottom))
+                .overlay(CarbonWeave().clipShape(shape).opacity(expanded ? 1 : 0.4))
+                .overlay(
+                    shape.stroke(Theme.f1Red, lineWidth: expanded ? 2 : 1.4)
+                        .shadow(color: Theme.f1Red.opacity(0.8), radius: 3)
+                )
+        } else if model.style == .slotMachine {
             shape
                 .fill(LinearGradient(
                     stops: [
@@ -189,7 +211,7 @@ struct IslandPill: View {
             // Left wing — the agent's mark, ALWAYS here, centered (never moves between states).
             // Animates while working and rests next to the status when attention is needed.
             AgentGlyph(provider: model.provider, working: model.state.isWorking, size: iconSize,
-                       tint: model.style == .slotMachine ? Theme.gold : nil)
+                       tint: glyphTint)
                 .frame(width: iconSize, height: iconSize)
                 .frame(width: wing, height: closedH)
                 .offset(x: wingInset)                  // nudge toward the notch to optically center
@@ -204,8 +226,27 @@ struct IslandPill: View {
         }
     }
 
+    private var glyphTint: Color? {
+        switch model.style {
+        case .classic:     return nil
+        case .slotMachine: return Theme.gold
+        case .pitWall:     return Theme.f1Red
+        }
+    }
+
     @ViewBuilder private var rightStatus: some View {
-        if model.style == .slotMachine,
+        if model.style == .pitWall,
+           model.readyCount > 0, model.state != .permission, model.state != .error {
+            PitBadge(text: "\(model.readyCount)/\(model.sessions.count)", stripe: Theme.f1Green,
+                     showsFlag: true)
+                .accessibilityLabel(
+                    "\(model.readyCount) sessions ready of \(model.sessions.count) open"
+                )
+                .help("\(model.readyCount) ready / \(model.sessions.count) open")
+        } else if model.style == .pitWall,
+                  model.isMulti, model.state != .permission, model.state != .error {
+            PitBadge(text: "\(model.sessions.count)")
+        } else if model.style == .slotMachine,
            model.readyCount > 0, model.state != .permission, model.state != .error {
             SlotCounter(text: "\(model.readyCount)/\(model.sessions.count)", showsCheck: true)
                 .accessibilityLabel(
@@ -279,6 +320,8 @@ struct IslandPill: View {
             sessionStack
         } else if model.style == .slotMachine, let session = model.sessions.first {
             slotSingleDrop(session)
+        } else if model.style == .pitWall, let session = model.sessions.first {
+            pitWallSingleDrop(session)
         } else {
             singleDrop
         }
@@ -294,6 +337,21 @@ struct IslandPill: View {
             Label("Open terminal", systemImage: "arrow.up.forward.app")
                 .font(.system(size: 9.5, weight: .bold, design: .rounded))
                 .foregroundStyle(Theme.goldGradient)
+        }
+        .padding(.horizontal, 6)
+        .padding(.top, 7)
+        .frame(width: closedWidth)
+    }
+
+    /// One session in pit-wall style: its timing-tower line plus the radio call to open it.
+    private func pitWallSingleDrop(_ session: SessionInfo) -> some View {
+        VStack(spacing: 5) {
+            PitWallRow(session: session, position: 1, isLeader: true,
+                       isHovered: model.hoveredSessionID == session.id,
+                       spinToken: model.spinCount)
+            Label("Radio: open terminal", systemImage: "antenna.radiowaves.left.and.right")
+                .font(Theme.raceFont(9.5))
+                .foregroundStyle(Theme.f1Mint)
         }
         .padding(.horizontal, 6)
         .padding(.top, 7)
@@ -347,8 +405,16 @@ struct IslandPill: View {
     @ViewBuilder private var sessionStack: some View {
         let scroll = ScrollView(.vertical) {
             VStack(spacing: Theme.sessionRowSpacing) {
-                ForEach(model.sessions) { session in
-                    if model.style == .slotMachine {
+                ForEach(Array(model.sessions.enumerated()), id: \.element.id) { index, session in
+                    if model.style == .pitWall {
+                        PitWallRow(
+                            session: session,
+                            position: index + 1,
+                            isLeader: session.id == model.displayedId,
+                            isHovered: model.hoveredSessionID == session.id,
+                            spinToken: model.spinCount
+                        )
+                    } else if model.style == .slotMachine {
                         SlotSessionRow(
                             session: session,
                             isWinningLine: session.id == model.displayedId,
