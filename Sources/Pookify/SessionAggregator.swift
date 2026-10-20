@@ -105,6 +105,9 @@ enum SessionAggregator {
                 try? FileManager.default.removeItem(at: url)
                 continue
             }
+            // Its terminal is gone but the process lingers: nothing to show or open. Keep the
+            // file in case the process is adopted again; it is reaped once the process exits.
+            if snap.pid > 0 && CopilotProcessDiscovery.isOrphaned(snap.pid) { continue }
             candidates.append((url, snap))
         }
 

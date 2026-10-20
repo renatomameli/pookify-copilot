@@ -6,6 +6,12 @@ All notable changes to Pookify Copilot are documented here. The format follows
 
 ## [Unreleased]
 
+- Clicking a session reliably brings its terminal to the front, even when macOS ignores the
+  activation request from the background island app (it now also asks the window server directly).
+- Copilot processes left running after their terminal window was closed no longer appear as
+  unopenable Idle rows.
+- Click and activation diagnostics are now readable with
+  `log show --predicate 'subsystem == "com.pookify.copilot"'`.
 - Added an optional **Block Craft** style: code-drawn pixel blocks in inventory slots, mining
   cracks while working, flashing TNT for permission, gems when finished, XP timers, and an XP bar.
 - Added an optional **F1 Pit Wall** style: a carbon-fibre timing tower with positions, team

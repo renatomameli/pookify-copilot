@@ -95,7 +95,7 @@ final class NotchWindowController: NSObject {
         let hosting = PassthroughHostingView(rootView: root)
         hosting.contextMenuProvider = { [weak self] in
             guard let self else { return nil }
-            NSLog("Pookify Copilot: opening context menu from hosting view.")
+            Log.info("Pookify Copilot: opening context menu from hosting view.")
             return self.contextMenu()
         }
         hosting.translatesAutoresizingMaskIntoConstraints = true
@@ -165,7 +165,7 @@ final class NotchWindowController: NSObject {
         let pointerInside = model.isVisible && rect.contains(viewPoint)
         if ProcessInfo.processInfo.environment["ISLAND_DEBUG"] == "1",
            lastPointerInside != pointerInside {
-            NSLog(
+            Log.info(
                 "Pookify Copilot: mouse routing screen=\(NSEvent.mouseLocation) "
                 + "view=\(viewPoint) rect=\(rect) inside=\(pointerInside)"
             )
@@ -300,7 +300,7 @@ final class NotchWindowController: NSObject {
         let viewPoint = hosting.convert(point, from: nil)
         guard hosting.interactiveRect.contains(viewPoint) else { return false }
 
-        NSLog("Pookify Copilot: opening context menu.")
+        Log.info("Pookify Copilot: opening context menu.")
         contextMenu().popUp(positioning: nil, at: viewPoint, in: hosting)
         return true
     }
@@ -413,7 +413,7 @@ final class NotchWindowController: NSObject {
         if model.style == .slotMachine, model.isTall {
             let rect = hosting.interactiveRect
             if viewPoint.x >= rect.maxX - Theme.leverWidth {
-                NSLog("Pookify Copilot: lever pulled.")
+                Log.info("Pookify Copilot: lever pulled.")
                 model.spinCount += 1
                 return true
             }
@@ -434,7 +434,7 @@ final class NotchWindowController: NSObject {
 
         guard let index = sessionIndex(atViewPoint: viewPoint) else { return false }
         let session = model.sessions[index]
-        NSLog("Pookify Copilot: routed click to session row \(index), \(session.id).")
+        Log.info("Pookify Copilot: routed click to session row \(index), \(session.id).")
         model.onSelectSession(session.id)
         return true
     }

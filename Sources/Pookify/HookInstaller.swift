@@ -126,7 +126,7 @@ enum HookInstaller {
         do {
             return try installAll()
         } catch {
-            NSLog("Pookify Copilot: hook installation failed: \(error.localizedDescription)")
+            Log.info("Pookify Copilot: hook installation failed: \(error.localizedDescription)")
             return nil
         }
     }

@@ -22,14 +22,19 @@ enum TerminalActivator {
                         return
                     }
                     let activated = application.activate(options: [.activateAllWindows])
-                    if !activated {
+                    // macOS may silently ignore activation requests from a background agent app
+                    // (it reports success, but another app stays frontmost), so also ask the
+                    // window server directly. This also switches to the window's Space.
+                    let forced = WindowServerFocus.bringToFront(pid: application.processIdentifier)
+                    if !activated && !forced {
                         reportFailure(
                             "\(application.localizedName ?? "the terminal") could not be activated"
                         )
                     } else {
-                        NSLog(
+                        Log.info(
                             "Pookify Copilot: activated \(application.localizedName ?? "terminal") "
-                            + "PID \(application.processIdentifier) for session PID \(sessionPID)."
+                            + "PID \(application.processIdentifier) for session PID \(sessionPID) "
+                            + "(public=\(activated), windowServer=\(forced))."
                         )
                     }
                 }
@@ -49,14 +54,14 @@ enum TerminalActivator {
         do {
             try process.run()
         } catch {
-            NSLog("Pookify Copilot: could not inspect process ancestry: \(error.localizedDescription)")
+            Log.info("Pookify Copilot: could not inspect process ancestry: \(error.localizedDescription)")
             return []
         }
 
         let data = output.fileHandleForReading.readDataToEndOfFile()
         process.waitUntilExit()
         guard process.terminationStatus == 0 else {
-            NSLog("Pookify Copilot: ps exited with status \(process.terminationStatus).")
+            Log.info("Pookify Copilot: ps exited with status \(process.terminationStatus).")
             return []
         }
 
@@ -93,9 +98,44 @@ enum TerminalActivator {
     }
 
     private static func reportFailure(_ reason: String) {
-        NSLog("Pookify Copilot: \(reason).")
+        Log.info("Pookify Copilot: \(reason).")
         DispatchQueue.main.async {
             NSSound.beep()
         }
+    }
+}
+
+/// Brings a process to the front through the window server, the way window switchers such as
+/// AltTab do. These are private SkyLight/HIServices symbols, resolved at runtime so the app keeps
+/// working (falling back to the public API alone) if a future macOS removes them.
+enum WindowServerFocus {
+    private typealias GetProcessForPID = @convention(c) (
+        pid_t, UnsafeMutablePointer<ProcessSerialNumber>
+    ) -> OSStatus
+    private typealias SetFrontProcess = @convention(c) (
+        UnsafeMutablePointer<ProcessSerialNumber>, UInt32, UInt32
+    ) -> Int32
+
+    /// `kCPSUserGenerated`: treat the request like a user-initiated switch.
+    private static let userGenerated: UInt32 = 0x200
+
+    private static let symbols: (GetProcessForPID, SetFrontProcess)? = {
+        guard
+            let skyLight = dlopen("/System/Library/PrivateFrameworks/SkyLight.framework/SkyLight", RTLD_LAZY),
+            let services = dlopen(
+                "/System/Library/Frameworks/ApplicationServices.framework/ApplicationServices", RTLD_LAZY
+            ),
+            let getPSN = dlsym(services, "GetProcessForPID"),
+            let setFront = dlsym(skyLight, "_SLPSSetFrontProcessWithOptions")
+        else { return nil }
+        return (unsafeBitCast(getPSN, to: GetProcessForPID.self),
+                unsafeBitCast(setFront, to: SetFrontProcess.self))
+    }()
+
+    static func bringToFront(pid: pid_t) -> Bool {
+        guard let (getPSN, setFront) = symbols else { return false }
+        var psn = ProcessSerialNumber()
+        guard getPSN(pid, &psn) == noErr else { return false }
+        return setFront(&psn, 0, userGenerated) == 0
     }
 }

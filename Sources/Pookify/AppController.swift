@@ -93,11 +93,11 @@ final class AppController: NSObject, NSApplicationDelegate {
     /// follow urgency, so opening a completed session cannot leave the whole island showing Done.
     private func selectSession(_ id: String) {
         guard let session = lastDecision?.sessions.first(where: { $0.id == id }) else {
-            NSLog("Pookify Copilot: selected session \(id) is no longer available.")
+            Log.info("Pookify Copilot: selected session \(id) is no longer available.")
             NSSound.beep()
             return
         }
-        NSLog("Pookify Copilot: opening terminal for session \(id), PID \(session.pid).")
+        Log.info("Pookify Copilot: opening terminal for session \(id), PID \(session.pid).")
         TerminalActivator.activate(sessionPID: session.pid)
     }
 

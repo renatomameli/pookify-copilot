@@ -96,6 +96,15 @@ enum CopilotProcessDiscovery {
         }
     }
 
+    /// A Copilot process whose terminal was closed but which kept running: it was reparented to
+    /// launchd and lost its controlling terminal. There is no window to open for it.
+    static func isOrphaned(_ pid: pid_t) -> Bool {
+        var info = proc_bsdinfo()
+        let size = proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &info, Int32(MemoryLayout<proc_bsdinfo>.stride))
+        guard size == MemoryLayout<proc_bsdinfo>.stride else { return false }
+        return info.pbi_ppid == 1 && info.e_tpgid <= 0
+    }
+
     private static func workingDirectory(for pid: pid_t) -> String {
         var info = proc_vnodepathinfo()
         let size = proc_pidinfo(
