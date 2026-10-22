@@ -98,7 +98,7 @@ final class AppController: NSObject, NSApplicationDelegate {
             return
         }
         Log.info("Pookify Copilot: opening terminal for session \(id), PID \(session.pid).")
-        TerminalActivator.activate(sessionPID: session.pid)
+        TerminalActivator.activate(sessionPID: session.pid, sessionID: session.id)
     }
 
     private func apply(_ d: IslandDecision) {

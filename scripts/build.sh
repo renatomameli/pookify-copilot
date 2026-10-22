@@ -72,6 +72,7 @@ $ICON_PLIST_LINE
   <key>LSUIElement</key>                  <true/>
   <key>NSHighResolutionCapable</key>      <true/>
   <key>NSPrincipalClass</key>             <string>NSApplication</string>
+  <key>NSAppleEventsUsageDescription</key><string>Pookify Copilot asks Ghostty to show the tab that runs the Copilot session you clicked.</string>
 </dict>
 </plist>
 PLIST

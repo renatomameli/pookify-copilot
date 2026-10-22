@@ -159,8 +159,10 @@ To preview every state without installing hooks, see [DEMO.md](DEMO.md).
   fullscreen applications.
 - With several displays, right-click the island and use **Display** to move it immediately.
   **Automatic** returns it to the built-in notched display. The choice is remembered.
-- Terminal focusing follows the Copilot process to its owning macOS application. If several
-  terminal windows share one application process, the application's most recent window is used.
+- Terminal focusing follows the Copilot process to its owning macOS application. In Ghostty 1.3+
+  it focuses the exact tab or window, matched by the Copilot session name in the tab title; macOS
+  asks once for permission to control Ghostty (reset with `tccutil reset AppleEvents
+  com.pookify.copilot`). Other apps that host several sessions show their most recent window.
 - A turn that terminates without an `agentStop` or `sessionEnd` event is hidden by a conservative
   stale-state backstop.
 

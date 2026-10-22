@@ -4,10 +4,10 @@ import IslandCore
 /// Brings the macOS application that owns a Copilot session to the foreground.
 ///
 /// Copilot's recorded PID belongs to its CLI process. Walking that process's ancestors reaches
-/// the terminal or IDE application that launched it. This also distinguishes separate Ghostty
-/// windows because each window can be hosted by its own application process.
+/// the terminal or IDE application that launched it. Separate Ghostty processes are told apart
+/// by that ancestry; tabs and windows inside one Ghostty process are focused by session name.
 enum TerminalActivator {
-    static func activate(sessionPID: Int32) {
+    static func activate(sessionPID: Int32, sessionID: String) {
         guard sessionPID > 0 else {
             reportFailure("the session has no process identifier")
             return
@@ -15,6 +15,13 @@ enum TerminalActivator {
 
         DispatchQueue.global(qos: .userInitiated).async {
             let ancestry = processAncestry(startingAt: sessionPID)
+            let ghosttyPID = ancestry.first { pid in
+                NSRunningApplication(processIdentifier: pid)?.bundleIdentifier == GhosttyFocus.bundleID
+            }
+            // Select the session's own tab first, so bringing the app forward shows that window.
+            let tabFocused = ghosttyPID.map {
+                GhosttyFocus.focus(sessionID: sessionID, copilotPID: sessionPID, appPID: $0)
+            } ?? false
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
                     guard let application = owningApplication(in: ancestry) else {
@@ -34,7 +41,7 @@ enum TerminalActivator {
                         Log.info(
                             "Pookify Copilot: activated \(application.localizedName ?? "terminal") "
                             + "PID \(application.processIdentifier) for session PID \(sessionPID) "
-                            + "(public=\(activated), windowServer=\(forced))."
+                            + "(public=\(activated), windowServer=\(forced), tab=\(tabFocused))."
                         )
                     }
                 }

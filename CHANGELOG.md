@@ -6,6 +6,10 @@ All notable changes to Pookify Copilot are documented here. The format follows
 
 ## [Unreleased]
 
+- Clicking a session that runs in a tab or window of a shared Ghostty instance now focuses that
+  exact tab (via Ghostty 1.3's scripting support; macOS asks once for permission to control
+  Ghostty). Previously Ghostty just showed its last-used window.
+- Turn timers past an hour read `1h05m` / `1d16h` instead of e.g. `2422:07`.
 - Clicking a session reliably brings its terminal to the front, even when macOS ignores the
   activation request from the background island app (it now also asks the window server directly).
 - Copilot processes left running after their terminal window was closed no longer appear as

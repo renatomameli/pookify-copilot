@@ -149,9 +149,11 @@ extension Color {
     }
 }
 
-/// "0:43" / "1:05" / "12:30" — a compact, single-line media-style clock (with monospaced digits
-/// it never reflows or wraps).
+/// "0:43" / "12:30" under an hour, then "1h05m" and "1d16h" — always short enough for the
+/// timer slot, however long an autonomous turn runs.
 func elapsedString(_ seconds: Int) -> String {
     let s = max(0, seconds)
-    return String(format: "%d:%02d", s / 60, s % 60)
+    if s < 3600 { return String(format: "%d:%02d", s / 60, s % 60) }
+    if s < 86400 { return String(format: "%dh%02dm", s / 3600, s % 3600 / 60) }
+    return String(format: "%dd%02dh", s / 86400, s % 86400 / 3600)
 }
