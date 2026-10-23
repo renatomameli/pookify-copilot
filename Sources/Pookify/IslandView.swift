@@ -451,6 +451,7 @@ struct IslandPill: View {
         let scroll = ScrollView(.vertical) {
             VStack(spacing: Theme.sessionRowSpacing) {
                 ForEach(Array(model.sessions.enumerated()), id: \.element.id) { index, session in
+                    Group {
                     if model.style == .blockCraft {
                         BlockCraftRow(
                             session: session,
@@ -478,9 +479,13 @@ struct IslandPill: View {
                         SessionRow(
                             session: session,
                             isDisplayed: session.id == model.displayedId,
-                            hovering: model.hoveredSessionID == session.id
+                            hovering: model.hoveredSessionID == session.id,
+                            isCurrent: session.id == model.focusedSessionID
                         )
                     }
+                    }
+                    .overlay(CurrentWindowMarker(style: model.style,
+                                                 visible: session.id == model.focusedSessionID))
                 }
             }
             .padding(.horizontal, 6)   // slim insets: rows need every point of width
@@ -552,7 +557,7 @@ struct IslandPill: View {
         case .permission: return model.label.isEmpty ? "Awaiting input" : model.label
         case .done:       return "Done"
         case .completed:  return "Done"
-        case .error:      return "Error"
+        case .error:      return model.label.isEmpty ? "Error" : model.label
         case .idle:       return "Idle"
         default:          return model.label.isEmpty ? "Working…" : model.label
         }
@@ -579,6 +584,8 @@ private struct SessionRow: View {
     let session: SessionInfo
     let isDisplayed: Bool
     let hovering: Bool
+    /// This session's terminal is the window the user is in right now.
+    var isCurrent = false
 
     var body: some View {
         HStack(spacing: 7) {
@@ -590,6 +597,13 @@ private struct SessionRow: View {
                 .foregroundStyle(.white)
                 .lineLimit(1)
                 .layoutPriority(1)
+            if isCurrent {
+                Image(systemName: "eye.fill")
+                    .font(.system(size: 8.5, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.7))
+                    .help("You are in this session's window")
+                    .transition(.opacity)
+            }
             // Activity + file name: the file name is the informative part and must stay whole.
             // When both can't fit, the generic label drops out entirely so only useful context
             // remains. A truly long file name truncates in the middle to preserve its extension.
@@ -623,6 +637,7 @@ private struct SessionRow: View {
         .accessibilityLabel("Open \(projectDisplay) terminal, \(activityWord)")
         .animation(.easeOut(duration: 0.15), value: hovering)
         .animation(.easeOut(duration: 0.15), value: isDisplayed)
+        .animation(.easeOut(duration: 0.2), value: isCurrent)
     }
 
     private var dotColor: Color {
@@ -662,7 +677,7 @@ private struct SessionRow: View {
         case .permission: return session.label.isEmpty ? "Awaiting input" : session.label
         case .done:       return "Done"
         case .completed:  return "Done"
-        case .error:      return "Error"
+        case .error:      return session.label.isEmpty ? "Error" : session.label
         case .idle:       return "Idle"
         default:          return session.label.isEmpty ? "Working…" : session.label
         }
@@ -687,6 +702,47 @@ private struct SessionRow: View {
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.system(size: 9, weight: .semibold))
                 .foregroundStyle(Theme.amber)
+        }
+    }
+}
+
+/// Outline around the row of the session whose window is frontmost ("you are here"), in each
+/// style's accent. Themed rows draw their body inset from the row edges, so the outline follows.
+private struct CurrentWindowMarker: View {
+    let style: IslandStyle
+    let visible: Bool
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            .strokeBorder(color, lineWidth: 1.3)
+            .shadow(color: color.opacity(0.7), radius: 3)
+            .padding(.horizontal, inset)
+            .opacity(visible ? 1 : 0)
+            .animation(.easeOut(duration: 0.2), value: visible)
+            .allowsHitTesting(false)
+    }
+
+    private var color: Color {
+        switch style {
+        case .classic:     return .white.opacity(0.45)
+        case .slotMachine: return Theme.gold
+        case .pitWall:     return Theme.f1Mint
+        case .blockCraft:  return Theme.xpGreen
+        }
+    }
+
+    private var inset: CGFloat {
+        switch style {
+        case .pitWall, .blockCraft: return 5
+        default:                    return 0
+        }
+    }
+
+    private var cornerRadius: CGFloat {
+        switch style {
+        case .blockCraft: return 0
+        case .pitWall:    return 5
+        default:          return 8
         }
     }
 }

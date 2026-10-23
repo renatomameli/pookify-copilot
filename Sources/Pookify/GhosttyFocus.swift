@@ -111,45 +111,70 @@ enum GhosttyFocus {
     }
 }
 
-/// Reads Copilot's own session metadata from `~/.copilot/session-state`.
-enum CopilotSessionNames {
-    private static var root: URL {
-        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".copilot/session-state")
-    }
+extension GhosttyFocus {
+    /// Title of Ghostty's front window (its selected tab), or nil when unavailable. Never shows the
+    /// automation prompt: this runs on a timer, so it only works once the user allowed it.
+    static func frontWindowTitle(appPID: pid_t) -> String? {
+        let target = NSAppleEventDescriptor(processIdentifier: appPID)
+        guard AEDeterminePermissionToAutomateTarget(target.aeDesc, typeWildCard, typeWildCard, false) == noErr
+        else { return nil }
 
-    /// The session's display name. Rows found only through process discovery have no hook
-    /// session ID; for those, use the session the process holds open most recently.
-    static func name(sessionID: String, copilotPID: Int32) -> String? {
-        if !sessionID.hasPrefix("process-"), let name = name(in: root.appendingPathComponent(sessionID)) {
-            return name
+        func property(_ name: String, of container: NSAppleEventDescriptor) -> NSAppleEventDescriptor {
+            let spec = NSAppleEventDescriptor.record().coerce(toDescriptorType: typeObjectSpecifier)!
+            spec.setDescriptor(NSAppleEventDescriptor(typeCode: FourCharCode(cProperty)), forKeyword: AEKeyword(keyAEDesiredClass))
+            spec.setDescriptor(NSAppleEventDescriptor(enumCode: FourCharCode(formPropertyID)), forKeyword: AEKeyword(keyAEKeyForm))
+            spec.setDescriptor(NSAppleEventDescriptor(typeCode: code(name)), forKeyword: AEKeyword(keyAEKeyData))
+            spec.setDescriptor(container, forKeyword: AEKeyword(keyAEContainer))
+            return spec
         }
-        return newestSessionDirectory(heldBy: copilotPID).flatMap(name(in:))
+        let title = property("pnam", of: property("GFWn", of: NSAppleEventDescriptor.null()))
+        return (try? send(event: "getd", eventClass: "core", to: appPID, directObject: title))?.stringValue
     }
+}
 
-    private static func name(in directory: URL) -> String? {
-        guard let text = try? String(contentsOf: directory.appendingPathComponent("workspace.yaml"),
-                                     encoding: .utf8) else { return nil }
-        for line in text.split(separator: "\n") where line.hasPrefix("name:") {
-            var value = line.dropFirst("name:".count).trimmingCharacters(in: .whitespaces)
-            if value.count >= 2, let first = value.first, first == "\"" || first == "'", value.last == first {
-                value = String(value.dropFirst().dropLast())
+/// Works out which session's terminal the user is looking at right now.
+enum FocusedSession {
+    private static var ancestryCache: [Int32: [Int32]] = [:]
+    private static let lock = NSLock()
+
+    /// Blocks on an Apple Event when Ghostty is frontmost; call it off the main thread.
+    static func identify(frontPID: pid_t, frontBundleID: String?, sessions: [SessionInfo]) -> String? {
+        let candidates = sessions.filter { ancestors(of: $0.pid).contains(frontPID) }
+        guard !candidates.isEmpty else { return nil }
+        if frontBundleID == GhosttyFocus.bundleID,
+           let title = GhosttyFocus.frontWindowTitle(appPID: frontPID) {
+            if let named = candidates.first(where: { !$0.sessionName.isEmpty && title.hasPrefix($0.sessionName) }) {
+                return named.id
             }
-            return value.isEmpty ? nil : value
+            // A session Copilot has not named yet is titled just "GitHub Copilot"; any other title
+            // means a different tab (a plain shell, say) is in front.
+            let unnamed = candidates.filter { $0.sessionName.isEmpty }
+            return unnamed.count == 1 && title.contains("GitHub Copilot") ? unnamed[0].id : nil
         }
-        return nil
+        return candidates.count == 1 ? candidates[0].id : nil
     }
 
-    private static func newestSessionDirectory(heldBy pid: Int32) -> URL? {
-        guard pid > 0, let directories = try? FileManager.default.contentsOfDirectory(
-            at: root, includingPropertiesForKeys: nil) else { return nil }
-        let lock = "inuse.\(pid).lock"
-        func modified(_ url: URL) -> Date {
-            let events = url.appendingPathComponent("events.jsonl")
-            return (try? events.resourceValues(forKeys: [.contentModificationDateKey]))?
-                .contentModificationDate ?? .distantPast
+    /// Parent chain of a process, cached: a live process never changes its ancestry.
+    private static func ancestors(of pid: Int32) -> [Int32] {
+        lock.lock()
+        if let cached = ancestryCache[pid] { lock.unlock(); return cached }
+        lock.unlock()
+        var chain: [Int32] = []
+        var current = pid
+        while current > 1, !chain.contains(current) {
+            chain.append(current)
+            // sysctl, not proc_pidinfo: the chain passes through root-owned /usr/bin/login, which
+            // proc_pidinfo refuses to describe to an unprivileged caller.
+            var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, current]
+            var info = kinfo_proc()
+            var size = MemoryLayout<kinfo_proc>.stride
+            guard sysctl(&mib, 4, &info, &size, nil, 0) == 0, size > 0 else { break }
+            current = info.kp_eproc.e_ppid
         }
-        return directories
-            .filter { FileManager.default.fileExists(atPath: $0.appendingPathComponent(lock).path) }
-            .max { modified($0) < modified($1) }
+        lock.lock()
+        if ancestryCache.count > 256 { ancestryCache.removeAll() }
+        ancestryCache[pid] = chain
+        lock.unlock()
+        return chain
     }
 }

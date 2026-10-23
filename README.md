@@ -57,7 +57,8 @@ Run as many local Copilot CLI sessions as you want. The closed island shows the 
 the most attention. Permission and input requests take priority and auto-expand once. Hover or
 click the island to open the full session stack. Clicking a row brings that session's existing
 terminal or IDE to the foreground while the closed bar continues following the most urgent
-session. Open sessions remain listed as **Idle** between turns, so every terminal stays
+session. Each row shows Copilot's session name, and the session whose window you are in is
+outlined. Open sessions remain listed as **Idle** between turns, so every terminal stays
 selectable. If a hook snapshot is missing, Pookify also discovers the live local Copilot process
 and restores it as **Idle**. When one or more sessions finish, the closed island shows
 **ready/open** in a green badge. The badge remains visible after all work finishes until those Copilot

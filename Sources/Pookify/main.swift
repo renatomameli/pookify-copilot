@@ -11,6 +11,7 @@ if argv.contains("--dump-sessions") {
             "pid": Int($0.pid),
             "state": $0.state.rawValue,
             "label": $0.label,
+            "name": $0.project,
         ]
     }
     do {

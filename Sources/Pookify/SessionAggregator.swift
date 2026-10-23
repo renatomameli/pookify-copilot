@@ -11,7 +11,8 @@ struct SessionInfo: Identifiable, Equatable {
     var state: AgentState   // effective state (caps/lingers applied)
     var label: String       // "Editing", "Thinking…", "Awaiting permission", …
     var detail: String      // file basename while in a tool, else empty
-    var project: String     // basename of the session's cwd
+    var project: String     // Copilot's session name, else the basename of the session's cwd
+    var sessionName: String = ""  // Copilot's session name ("" until Copilot names the session)
     var startedAt: Double   // turn clock start (0 = no active turn)
 }
 
@@ -160,19 +161,30 @@ enum SessionAggregator {
         // Every open session gets a row. A stale working state may resolve to idle, but the live
         // process remains selectable and will update again on its next prompt.
         let sessions: [SessionInfo] = live.indices.map { i -> SessionInfo in
-            let eff = displayState(i)
+            var eff = displayState(i)
             let s = live[i]
+            // When a tool has lingered out to thinking, show "Thinking…" rather than the stale tool label.
+            var label = (s.state == .tool && eff == .thinking) ? "Thinking…" : s.label
+            var startedAt = s.startedAt
+            // "Recovering" while Copilot retries; once it gives up, the turn is over and failed.
+            if s.state == .thinking, s.label.hasPrefix("Recovering"),
+               CopilotTurnFailure.failed(sessionID: s.sessionId, copilotPID: s.pid) {
+                eff = .error
+                label = "Failed – retry"
+                startedAt = 0
+            }
+            let name = CopilotSessionNames.name(sessionID: s.sessionId, copilotPID: s.pid) ?? ""
             return SessionInfo(
                 id: s.sessionId,
                 pid: s.pid,
                 provider: s.provider,
                 state: eff,
-                // When a tool has lingered out to thinking, show "Thinking…" rather than the stale tool label.
-                label: (s.state == .tool && eff == .thinking) ? "Thinking…" : s.label,
+                label: label,
                 // The file subtitle only makes sense while actually in a tool (not once it lingers out).
                 detail: eff == .tool ? s.detail : "",
-                project: s.project,
-                startedAt: s.startedAt
+                project: name.isEmpty ? s.project : name,
+                sessionName: name,
+                startedAt: startedAt
             )
         }.sorted { a, b in
             if a.state.priority != b.state.priority { return a.state.priority > b.state.priority }

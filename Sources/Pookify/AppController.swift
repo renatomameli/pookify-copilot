@@ -51,12 +51,54 @@ final class AppController: NSObject, NSApplicationDelegate {
             model.userExpanded = true
         }
 
+        let focusTimer = Timer(timeInterval: 1.0, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refreshFocusedSession() }
+        }
+        RunLoop.main.add(focusTimer, forMode: .common)
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refreshFocusedSession() }
+        }
+
         let t = Timer(timeInterval: 0.4, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.tick() }
         }
         RunLoop.main.add(t, forMode: .common)
         pollTimer = t
         tick()
+    }
+
+    // MARK: current window
+
+    private var focusInFlight = false
+    private let focusQueue = DispatchQueue(label: "com.pookify.copilot.focus", qos: .utility)
+
+    /// Mark the session whose terminal is frontmost. Off the main thread: Ghostty is asked for its
+    /// front tab over Apple Events.
+    private func refreshFocusedSession() {
+        guard model.isVisible, model.isMulti, !focusInFlight,
+              let front = NSWorkspace.shared.frontmostApplication else {
+            if !model.isMulti, model.focusedSessionID != nil { model.focusedSessionID = nil }
+            return
+        }
+        focusInFlight = true
+        let sessions = model.sessions
+        let pid = front.processIdentifier
+        let bundleID = front.bundleIdentifier
+        focusQueue.async { [weak self] in
+            let id = FocusedSession.identify(frontPID: pid, frontBundleID: bundleID, sessions: sessions)
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    self.focusInFlight = false
+                    if self.model.focusedSessionID != id {
+                        Log.info("Pookify Copilot: current window session is \(id ?? "none").")
+                        self.model.focusedSessionID = id
+                    }
+                }
+            }
+        }
     }
 
     // MARK: poll loop

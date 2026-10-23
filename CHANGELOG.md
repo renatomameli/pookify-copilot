@@ -6,6 +6,12 @@ All notable changes to Pookify Copilot are documented here. The format follows
 
 ## [Unreleased]
 
+- Rows show Copilot's session name (for example "Review Merge Request 22746") instead of the
+  working-directory folder, which was often just the home directory name.
+- The session whose terminal window or Ghostty tab is frontmost is outlined in the stack (with an
+  eye icon in Classic style).
+- A turn that Copilot abandons after exhausting its retries ("Execution failed") now shows
+  **Failed – retry** instead of staying on "Recovering…" until the stale-state backstop.
 - Clicking a session that runs in a tab or window of a shared Ghostty instance now focuses that
   exact tab (via Ghostty 1.3's scripting support; macOS asks once for permission to control
   Ghostty). Previously Ghostty just showed its last-used window.

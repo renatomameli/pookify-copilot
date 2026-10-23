@@ -54,6 +54,8 @@ final class IslandModel: ObservableObject {
     @Published var sessions: [SessionInfo] = []
     /// Which session the closed bar is showing (highlighted in the stack).
     @Published var displayedId: String = ""
+    /// The session whose terminal window/tab is frontmost right now, marked in the stack.
+    @Published var focusedSessionID: String? = nil
 
     /// The expanded drop-down is the session stack rather than the single-session layout.
     var isMulti: Bool { sessions.count >= 2 }
