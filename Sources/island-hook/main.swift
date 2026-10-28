@@ -119,8 +119,27 @@ func appIsRunning() -> Bool {
     return kill(pid, 0) == 0 || errno == EPERM
 }
 
+/// Tool calls in this event. Newer Copilot versions batch parallel calls in preToolUse as
+/// `toolCalls: [{name, args}]` instead of a single `toolName` / `toolArgs`.
+func toolCalls() -> [(name: String, args: [String: Any])] {
+    let single = string("toolName", "tool_name")
+    if !single.isEmpty { return [(single, dictionary("toolArgs", "tool_input"))] }
+    guard let calls = value(["toolCalls", "tool_calls"]) as? [[String: Any]] else { return [] }
+    return calls.compactMap { call in
+        guard let name = call["name"] as? String, !name.isEmpty else { return nil }
+        return (name, call["args"] as? [String: Any] ?? [:])
+    }
+}
+
+/// While a permission prompt or question is open, the snapshot's `tool` field holds the
+/// comma-separated tools that may be waiting on it.
+func waitingTools(_ snapshot: SessionSnapshot?) -> Set<String> {
+    guard let snapshot, snapshot.state == .permission else { return [] }
+    return Set(snapshot.tool.split(separator: ",").map(String.init).filter { !$0.isEmpty })
+}
+
 func toolDetail() -> String {
-    let input = dictionary("toolArgs", "tool_input")
+    let input = toolCalls().first?.args ?? [:]
     for key in ["file_path", "notebook_path", "path"] {
         if let path = input[key] as? String, !path.isEmpty {
             return (path as NSString).lastPathComponent
@@ -165,6 +184,12 @@ if let previous = prev, eventAt + 0.001 < previous.ts {
     exit(0)
 }
 
+// Background activity must not hide an open question or permission prompt.
+if prev?.state == .permission, ["subagent-start", "subagent-stop", "compact"].contains(kind) {
+    debugLog("[\(String(sessionId.prefix(8)))] \(kind) ignored: waiting for the user")
+    exit(0)
+}
+
 switch kind {
 case "session-start":
     StateStore.removeOtherSessions(provider: provider, pid: sessionPID, keeping: sessionId)
@@ -177,13 +202,27 @@ case "prompt":
     writeState(.thinking, label: "Thinking...", startedAt: now())
 
 case "pre":
-    let tool = string("toolName", "tool_name")
-    writeState(.tool, label: toolLabel(provider: provider, tool: tool), tool: tool,
-               startedAt: turnStart(), detail: toolDetail())
+    // Copilot keeps running other tools while a question or permission prompt is open; those must
+    // not hide that the session is waiting for the user.
+    if prev?.state == .permission {
+        debugLog("[\(String(sessionId.prefix(8)))] pre ignored: waiting for the user")
+        exit(0)
+    }
+    let names = toolCalls().map(\.name)
+    let tool = names.first ?? ""
+    writeState(.tool, label: toolLabel(provider: provider, tool: tool),
+               tool: names.joined(separator: ","), startedAt: turnStart(), detail: toolDetail())
 
 case "post", "post-fail":
-    let eventTool = string("toolName", "tool_name")
-    let tool = eventTool.isEmpty ? (prev?.tool ?? "") : eventTool
+    let eventTool = toolCalls().first?.name ?? ""
+    // Only the tool that asked (ask_user, or the one needing permission) ends the wait.
+    let waiting = waitingTools(prev)
+    if !waiting.isEmpty, !waiting.contains(eventTool) {
+        debugLog("[\(String(sessionId.prefix(8)))] \(kind) \(eventTool) ignored: waiting for the user")
+        exit(0)
+    }
+    let tool = eventTool.isEmpty
+        ? String((prev?.tool ?? "").split(separator: ",").first ?? "") : eventTool
     if tool.isEmpty {
         writeState(.thinking, label: "Thinking...", startedAt: turnStart())
     } else {
@@ -210,10 +249,10 @@ case "compact":
 case "notify":
     switch string("notification_type", "notificationType").lowercased() {
     case "permission_prompt":
-        writeState(.permission, label: "Awaiting permission",
+        writeState(.permission, label: "Awaiting permission", tool: prev?.tool ?? "",
                    startedAt: turnStart())
     case "elicitation_dialog":
-        writeState(.permission, label: "Input requested",
+        writeState(.permission, label: "Input requested", tool: prev?.tool ?? "",
                    startedAt: turnStart())
     default:
         break

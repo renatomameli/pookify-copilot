@@ -6,6 +6,9 @@ All notable changes to Pookify Copilot are documented here. The format follows
 
 ## [Unreleased]
 
+- A session waiting on a question (`ask_user`) or a permission prompt now stays marked as waiting
+  while Copilot runs other tools in parallel; previously those tools flipped it back to
+  "Thinking…". Batched `toolCalls` hook payloads from newer Copilot versions are parsed too.
 - Rows show Copilot's session name (for example "Review Merge Request 22746") instead of the
   working-directory folder, which was often just the home directory name.
 - The session whose terminal window or Ghostty tab is frontmost is outlined in the stack (with an
