@@ -109,6 +109,7 @@ enum SessionAggregator {
             // Its terminal is gone but the process lingers: nothing to show or open. Keep the
             // file in case the process is adopted again; it is reaped once the process exits.
             if snap.pid > 0 && CopilotProcessDiscovery.isOrphaned(snap.pid) { continue }
+            if snap.pid > 0 && CopilotProcessDiscovery.isSuspended(snap.pid) { continue }
             candidates.append((url, snap))
         }
 
@@ -160,6 +161,9 @@ enum SessionAggregator {
 
         // Every open session gets a row. A stale working state may resolve to idle, but the live
         // process remains selectable and will update again on its next prompt.
+        // A process-only row is named after a session it holds open; skip sessions that already
+        // have their own hook row (a long-lived process keeps locks on every session it opened).
+        let trackedSessionIDs = Set(live.lazy.map(\.sessionId).filter { !$0.hasPrefix("process-") })
         let sessions: [SessionInfo] = live.indices.map { i -> SessionInfo in
             var eff = displayState(i)
             let s = live[i]
@@ -173,7 +177,8 @@ enum SessionAggregator {
                 label = "Failed – retry"
                 startedAt = 0
             }
-            let name = CopilotSessionNames.name(sessionID: s.sessionId, copilotPID: s.pid) ?? ""
+            let name = CopilotSessionNames.name(sessionID: s.sessionId, copilotPID: s.pid,
+                                                excluding: trackedSessionIDs) ?? ""
             return SessionInfo(
                 id: s.sessionId,
                 pid: s.pid,

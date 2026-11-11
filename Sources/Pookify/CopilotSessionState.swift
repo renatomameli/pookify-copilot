@@ -19,8 +19,8 @@ enum CopilotSessionNames {
     /// The session's display name (Copilot titles its terminal "<name> - GitHub Copilot").
     /// Rows found only through process discovery have no hook session ID; for those, use the
     /// session the process holds open most recently. Cached briefly: the poll loop asks often.
-    static func name(sessionID: String, copilotPID: Int32) -> String? {
-        let key = "\(sessionID)#\(copilotPID)"
+    static func name(sessionID: String, copilotPID: Int32, excluding: Set<String> = []) -> String? {
+        let key = "\(sessionID)#\(copilotPID)#\(excluding.sorted().joined(separator: ","))"
         lock.lock()
         if let hit = cache[key], Date().timeIntervalSince(hit.at) < cacheLifetime {
             lock.unlock()
@@ -28,19 +28,20 @@ enum CopilotSessionNames {
         }
         lock.unlock()
 
-        let name = directory(sessionID: sessionID, copilotPID: copilotPID).flatMap(name(in:))
+        let name = directory(sessionID: sessionID, copilotPID: copilotPID, excluding: excluding)
+            .flatMap(name(in:))
         lock.lock()
         cache[key] = (name, Date())
         lock.unlock()
         return name
     }
 
-    static func directory(sessionID: String, copilotPID: Int32) -> URL? {
+    static func directory(sessionID: String, copilotPID: Int32, excluding: Set<String> = []) -> URL? {
         if !sessionID.hasPrefix("process-") {
             let direct = root.appendingPathComponent(sessionID)
             if FileManager.default.fileExists(atPath: direct.path) { return direct }
         }
-        return newestSessionDirectory(heldBy: copilotPID)
+        return newestSessionDirectory(heldBy: copilotPID, excluding: excluding)
     }
 
     private static func name(in directory: URL) -> String? {
@@ -56,7 +57,7 @@ enum CopilotSessionNames {
         return nil
     }
 
-    private static func newestSessionDirectory(heldBy pid: Int32) -> URL? {
+    private static func newestSessionDirectory(heldBy pid: Int32, excluding: Set<String>) -> URL? {
         guard pid > 0, let directories = try? FileManager.default.contentsOfDirectory(
             at: root, includingPropertiesForKeys: nil) else { return nil }
         let lockName = "inuse.\(pid).lock"
@@ -66,6 +67,7 @@ enum CopilotSessionNames {
                 .contentModificationDate ?? .distantPast
         }
         return directories
+            .filter { !excluding.contains($0.lastPathComponent) }
             .filter { FileManager.default.fileExists(atPath: $0.appendingPathComponent(lockName).path) }
             .max { modified($0) < modified($1) }
     }

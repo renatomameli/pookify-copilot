@@ -76,6 +76,7 @@ enum CopilotProcessDiscovery {
             )
             guard infoSize == MemoryLayout<proc_bsdinfo>.stride,
                   info.pbi_uid == getuid(),
+                  info.pbi_status != UInt32(SSTOP),
                   discoveryRoot != nil || info.e_tpgid > 0 else { return nil }
 
             let cwd = workingDirectory(for: pid)
@@ -103,6 +104,14 @@ enum CopilotProcessDiscovery {
         let size = proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &info, Int32(MemoryLayout<proc_bsdinfo>.stride))
         guard size == MemoryLayout<proc_bsdinfo>.stride else { return false }
         return info.pbi_ppid == 1 && info.e_tpgid <= 0
+    }
+
+    /// A Copilot process suspended with Ctrl+Z. Its terminal now runs something else (often a newer
+    /// Copilot), so it is hidden until it is resumed with `fg`.
+    static func isSuspended(_ pid: pid_t) -> Bool {
+        var info = proc_bsdinfo()
+        let size = proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &info, Int32(MemoryLayout<proc_bsdinfo>.stride))
+        return size == MemoryLayout<proc_bsdinfo>.stride && info.pbi_status == UInt32(SSTOP)
     }
 
     private static func workingDirectory(for pid: pid_t) -> String {

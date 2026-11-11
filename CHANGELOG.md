@@ -6,6 +6,10 @@ All notable changes to Pookify Copilot are documented here. The format follows
 
 ## [Unreleased]
 
+- Copilot processes suspended with Ctrl+Z are hidden until resumed with `fg`; they no longer show as
+  an extra Idle row next to the Copilot that now runs in that terminal.
+- A row found only through process discovery is no longer named after a session that already has
+  its own row.
 - A session waiting on a question (`ask_user`) or a permission prompt now stays marked as waiting
   while Copilot runs other tools in parallel; previously those tools flipped it back to
   "Thinking…". Batched `toolCalls` hook payloads from newer Copilot versions are parsed too.
