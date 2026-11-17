@@ -169,7 +169,8 @@ enum SessionAggregator {
             let s = live[i]
             // When a tool has lingered out to thinking, show "Thinking…" rather than the stale tool label.
             var label = (s.state == .tool && eff == .thinking) ? "Thinking…" : s.label
-            var startedAt = s.startedAt
+            // A ready session shows its check, not the clock of a turn that is paused on the user.
+            var startedAt = eff == .done || eff == .completed ? 0 : s.startedAt
             // "Recovering" while Copilot retries; once it gives up, the turn is over and failed.
             if s.state == .thinking, s.label.hasPrefix("Recovering"),
                CopilotTurnFailure.failed(sessionID: s.sessionId, copilotPID: s.pid) {

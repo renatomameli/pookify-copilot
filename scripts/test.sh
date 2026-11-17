@@ -119,6 +119,18 @@ assert_equal "$(jq -r .label "$state")" "Input requested" "elicitation label"
 send error '{"sessionId":"integration","cwd":"/tmp/project","recoverable":false}'
 assert_equal "$(jq -r .state "$state")" error "non-recoverable error state"
 
+# A foreground Crit review waits on the user, so the session counts as ready until it returns.
+send pre '{"sessionId":"integration","cwd":"/tmp/project","toolCalls":[{"name":"bash","args":{"command":"cd ~/repo && crit --session abc123"}}]}'
+assert_equal "$(jq -r .state "$state")" "done" "crit review state"
+assert_equal "$(jq -r .label "$state")" "Review in Crit" "crit review label"
+send pre '{"sessionId":"integration","cwd":"/tmp/project","toolName":"view","toolArgs":{"path":"/tmp/x"}}'
+send post '{"sessionId":"integration","cwd":"/tmp/project","toolName":"view"}'
+assert_equal "$(jq -r .label "$state")" "Review in Crit" "parallel tool during crit review"
+send post '{"sessionId":"integration","cwd":"/tmp/project","toolName":"bash"}'
+assert_equal "$(jq -r .state "$state")" tool "crit review finished"
+send pre '{"sessionId":"integration","cwd":"/tmp/project","toolName":"bash","toolArgs":{"command":"crit comment --reply-to 1 done"}}'
+assert_equal "$(jq -r .label "$state")" "Running command" "headless crit subcommand"
+
 event_ms="$((($(date +%s) + 5) * 1000))"
 send prompt "{\"sessionId\":\"integration\",\"cwd\":\"/tmp/project\",\"timestamp\":$event_ms}"
 send stop "{\"sessionId\":\"integration\",\"cwd\":\"/tmp/project\",\"timestamp\":$((event_ms - 1000))}"

@@ -131,10 +131,43 @@ func toolCalls() -> [(name: String, args: [String: Any])] {
     }
 }
 
-/// While a permission prompt or question is open, the snapshot's `tool` field holds the
-/// comma-separated tools that may be waiting on it.
+/// Label of a turn that is blocked on the user reviewing in Crit (shown as ready).
+let critReviewLabel = "Review in Crit"
+
+/// The session is waiting on the user: a permission prompt, a question, or a Crit review.
+func isWaitingForUser(_ snapshot: SessionSnapshot?) -> Bool {
+    guard let snapshot else { return false }
+    return snapshot.state == .permission
+        || (snapshot.state == .done || snapshot.state == .completed) && snapshot.label == critReviewLabel
+}
+
+/// Crit subcommands that return immediately; every other `crit` invocation (bare, files, flags,
+/// live/preview/plan/story/resume, --session) blocks until the user clicks "Finish Review".
+private let critHeadlessSubcommands: Set<String> = [
+    "share", "fetch", "unpublish", "install", "config", "check", "pull", "push", "comment",
+    "comments", "auth", "stop", "status", "stats", "cleanup", "help", "--help", "-h",
+    "--version", "version",
+]
+
+/// Whether a shell command runs a blocking Crit review.
+func isBlockingCritReview(_ command: String) -> Bool {
+    let separators = CharacterSet(charactersIn: ";|&\n()")
+    for segment in command.components(separatedBy: separators) {
+        var words = segment.split(whereSeparator: \.isWhitespace).map(String.init)
+        while let first = words.first, first.contains("=") || ["exec", "command", "time"].contains(first) {
+            words.removeFirst()
+        }
+        guard let program = words.first, (program as NSString).lastPathComponent == "crit" else { continue }
+        let subcommand = words.dropFirst().first ?? ""
+        if !critHeadlessSubcommands.contains(subcommand) { return true }
+    }
+    return false
+}
+
+/// While the user is being waited on, the snapshot's `tool` field holds the comma-separated
+/// tools that may be waiting on it.
 func waitingTools(_ snapshot: SessionSnapshot?) -> Set<String> {
-    guard let snapshot, snapshot.state == .permission else { return [] }
+    guard let snapshot, isWaitingForUser(snapshot) else { return [] }
     return Set(snapshot.tool.split(separator: ",").map(String.init).filter { !$0.isEmpty })
 }
 
@@ -185,7 +218,7 @@ if let previous = prev, eventAt + 0.001 < previous.ts {
 }
 
 // Background activity must not hide an open question or permission prompt.
-if prev?.state == .permission, ["subagent-start", "subagent-stop", "compact"].contains(kind) {
+if isWaitingForUser(prev), ["subagent-start", "subagent-stop", "compact"].contains(kind) {
     debugLog("[\(String(sessionId.prefix(8)))] \(kind) ignored: waiting for the user")
     exit(0)
 }
@@ -204,12 +237,20 @@ case "prompt":
 case "pre":
     // Copilot keeps running other tools while a question or permission prompt is open; those must
     // not hide that the session is waiting for the user.
-    if prev?.state == .permission {
+    if isWaitingForUser(prev) {
         debugLog("[\(String(sessionId.prefix(8)))] pre ignored: waiting for the user")
         exit(0)
     }
-    let names = toolCalls().map(\.name)
+    let calls = toolCalls()
+    let names = calls.map(\.name)
     let tool = names.first ?? ""
+    // Copilot runs `crit` in the foreground and blocks until the user finishes the review in the
+    // browser: the ball is in the user's court, so the session is ready for them.
+    if let crit = calls.first(where: { ["bash", "powershell"].contains($0.name.lowercased())
+                                        && isBlockingCritReview($0.args["command"] as? String ?? "") }) {
+        writeState(.done, label: critReviewLabel, tool: crit.name, startedAt: turnStart())
+        break
+    }
     writeState(.tool, label: toolLabel(provider: provider, tool: tool),
                tool: names.joined(separator: ","), startedAt: turnStart(), detail: toolDetail())
 

@@ -555,8 +555,7 @@ struct IslandPill: View {
     private var statusTitle: String {
         switch model.state {
         case .permission: return model.label.isEmpty ? "Awaiting input" : model.label
-        case .done:       return "Done"
-        case .completed:  return "Done"
+        case .done, .completed: return model.label.isEmpty ? "Done" : model.label
         case .error:      return model.label.isEmpty ? "Error" : model.label
         case .idle:       return "Idle"
         default:          return model.label.isEmpty ? "Working…" : model.label
@@ -675,8 +674,7 @@ private struct SessionRow: View {
     private var activityWord: String {
         switch session.state {
         case .permission: return session.label.isEmpty ? "Awaiting input" : session.label
-        case .done:       return "Done"
-        case .completed:  return "Done"
+        case .done, .completed: return session.label.isEmpty ? "Done" : session.label
         case .error:      return session.label.isEmpty ? "Error" : session.label
         case .idle:       return "Idle"
         default:          return session.label.isEmpty ? "Working…" : session.label

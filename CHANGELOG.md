@@ -6,6 +6,9 @@ All notable changes to Pookify Copilot are documented here. The format follows
 
 ## [Unreleased]
 
+- While Copilot waits on a foreground [Crit](https://github.com/tomasz-tomczyk/crit) review, the
+  session shows **Review in Crit** and counts as ready, since it is waiting on you. Headless
+  subcommands such as `crit comment` or `crit share` still show as running.
 - Copilot processes suspended with Ctrl+Z are hidden until resumed with `fg`; they no longer show as
   an extra Idle row next to the Copilot that now runs in that terminal.
 - A row found only through process discovery is no longer named after a session that already has
